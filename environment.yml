@@ -1,0 +1,20 @@
+name: slurm_sweeps
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.9
+  - pytorch
+  - pytorch-cuda=11.8
+#  - cpuonly
+  - torchvision
+  - ipython
+  - pytest=7.3.1
+  - pre_commit=3.3.1
+  - blackd=22.10.0
+  - wandb
+  - pytorch-lightning
+  - pip
+  - pip:
+      - -e .

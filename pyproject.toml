@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slurm_sweeps"
+description= "A simple tool to perform sweeps on SLURM clusters."
+readme = "README.md"
+version = "0.1.dev"
+requires-python = ">=3.9"
+dependencies = [
+    "cloudpickle",
+    "fasteners",
+    "numpy",
+    "pandas",
+    "pyyaml",
+]
+
+[tool.isort]
+profile = "black"
