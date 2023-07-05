@@ -5,10 +5,10 @@ The main idea is to provide a lightweight [ASHA implementation](https://arxiv.or
 [SLURM clusters](https://slurm.schedmd.com/overview.html) that is fully compatible with
 [pytorch-lightning's ddp](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel).
 
-Heavily inspired by tools like [Ray Tune](https://www.ray.io/ray-tune) and [Optuna](https://optuna.org/).
-However, on a SLURM cluster these tools can be complicated to set up and introduce considerable overhead.
+It is heavily inspired by tools like [Ray Tune](https://www.ray.io/ray-tune) and [Optuna](https://optuna.org/).
+However, on a SLURM cluster, these tools can be complicated to set up and introduce considerable overhead.
 
-*Slurm sweeps* is simple, light weight and has very few dependencies.
+*Slurm sweeps* is simple, lightweight, and has few dependencies.
 It uses SLURM Job Steps to run the individual trials.
 
 ## Installation
@@ -26,7 +26,7 @@ pip install .
 - pyyaml
 
 ## Usage
-Run this example on your laptop.
+You can just run this example on your laptop.
 By default, the maximum number of parallel trials equals the number of CPUs on your machine.
 
 ```python
