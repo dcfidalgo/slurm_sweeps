@@ -54,55 +54,49 @@ def train(cfg):
     train_loader = DataLoader(dataset, batch_size=cfg["batch_size"])
     val_loader = DataLoader(dataset_val, batch_size=128)
 
+    # set up environment for ddp
+    plugins = ParallelSlurmEnvironment(auto_requeue=False)
+    os.environ["MASTER_ADDR"] = "localhost"
+
     # model
     model = Model(lr=cfg["lr"])
-
-    plugins = None
-    if cfg.get("slurm"):
-        plugins = ParallelSlurmEnvironment(auto_requeue=False)
-        os.environ["MASTER_ADDR"] = "localhost"
 
     # train model
     trainer = pl.Trainer(
         strategy="ddp",
         devices=4,
-        accelerator="cpu",
+        accelerator="gpu",
         max_epochs=cfg["max_epochs"],
         callbacks=SlurmSweepsCallback(
             cfg,
             "val_loss",
-            log_to_wandb=False,
+            log_to_wandb=True,
             wandb_init_kwargs=dict(
                 project=cfg["wandb_project"], group=cfg["wandb_group"]
             ),
         ),
-        enable_progress_bar=True,
         plugins=plugins,
     )
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
 
 if __name__ == "__main__":
-    cfg = {
-        "data_path": "/home/david/mpcdf/slurm_sweeps/tests",
-        "lr": ss.LogUniform(1.0e-3, 1.0e-1),
-        "batch_size": 128,
-        "max_epochs": 1,
-        "wandb_project": "slurm_sweeps",
-        "wandb_group": "test",
-        "slurm": True,
-    }
-
     experiment = ss.Experiment(
         train=train,
-        cfg=cfg,
-        name="LightningIntegration_task1",
+        cfg={
+            "data_path": "/home/david/slurm_sweeps/tests",
+            "lr": ss.LogUniform(1.0e-3, 1.0e-1),
+            "batch_size": 128,
+            "max_epochs": 2,
+            "wandb_project": "slurm_sweeps",
+            "wandb_group": "lightning_test",
+        },
+        name="LightningIntegration",
         asha=ss.ASHA(metric="val_loss", mode="min", reduction_factor=2, max_t=2),
-        exist_ok=True,
+        backend=ss.SlurmBackend(nodes=1, ntasks=4),
     )
 
     experiment.run(
-        4,
-        max_concurrent_trials=2,
+        n_trials=4,
         summarize_cfg_and_metrics=["lr", "batch_size", "val_loss"],
     )
