@@ -122,7 +122,7 @@ Run an HPO experiment using random search and the Asynchronous Successive Halvin
 
 <a id="slurm_sweeps.experiment.Experiment.run"></a>
 
-#### `DEF Experiment.run`
+#### `Experiment.run`
 
 ```python
 def run(
