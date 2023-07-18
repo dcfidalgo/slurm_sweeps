@@ -22,7 +22,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install -e .
-    - name: Test with pytest
+    - name: Install test dependencies
       run: |
-        python -m pip install pytest
-        pytest
+        python -m pip install pytest pytest-cov
+    - name: Running tests
+      run: |
+        pytest --cov=slurm_sweeps
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
