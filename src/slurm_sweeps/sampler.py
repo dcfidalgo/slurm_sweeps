@@ -1,4 +1,5 @@
-from typing import Any, List, Optional
+import itertools
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -55,3 +56,71 @@ class Choice(Random):
 
     def __call__(self) -> Any:
         return self._type(self._rng.choice(self._choices))
+
+
+class Grid:
+    """Define a grid search space.
+
+    Args:
+        values: The grid values
+    """
+
+    def __init__(self, values: List[Any]):
+        self._values = values
+
+    def __call__(self) -> List[Any]:
+        return self._values
+
+
+class Sampler:
+    """Sample from a cfg dict.
+
+    This iterable yields samples of the search space defined in the cfg dict.
+
+    Args:
+        cfg: The cfg dict
+        n: Number of samples this iterable yields. Will be ignored if the cfg dict defines a grid search space.
+    """
+
+    def __init__(self, cfg: Dict[str, Any], n: int = 1):
+        self._cfg = cfg
+        self._n = n
+        self._grid = self._extract_grid(cfg) or None
+
+    def _extract_grid(self, cfg: Dict[str, Any]) -> List[List[Any]]:
+        grids = []
+        for val in cfg.values():
+            if isinstance(val, Grid):
+                grids.append(val())
+            elif isinstance(val, dict):
+                grids += self._extract_grid(val)
+
+        return grids
+
+    def __iter__(self):
+        if self._grid is None:
+            yield from self._random_iterator(self._n)
+        else:
+            yield from self._grid_iterator()
+
+    def _grid_iterator(self):
+        for grid_values in itertools.product(*self._grid):
+            yield self._sample(self._cfg, list(grid_values))
+
+    def _random_iterator(self, n: int):
+        for _ in range(n):
+            yield self._sample(self._cfg)
+
+    def _sample(self, cfg, grid_values: Optional[List[Any]] = None):
+        suggested_cfg = {}
+        for key, val in cfg.items():
+            if isinstance(val, Random):
+                suggested_cfg[key] = val()
+            elif isinstance(val, Grid):
+                suggested_cfg[key] = grid_values.pop(0)
+            elif isinstance(val, dict):
+                suggested_cfg[key] = self._sample(val, grid_values)
+            else:
+                suggested_cfg[key] = val
+
+        return suggested_cfg
