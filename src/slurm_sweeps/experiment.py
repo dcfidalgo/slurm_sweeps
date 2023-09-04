@@ -22,8 +22,8 @@ from .constants import (
     TRIAL_ID,
 )
 from .database import Database
+from .sampler import Sampler
 from .storage import Storage
-from .suggest import Suggest
 from .trial import Status, Trial
 
 _logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class Experiment:
         """Run the experiment.
 
         Args:
-            n_trials: Number of trials to run.
+            n_trials: Number of trials to run. For grid searches this parameter is ignored.
             max_concurrent_trials: The maximum number of trials running concurrently. By default, we will set this to
                 the number of cpus available, or the number of total Slurm tasks divided by the number of trial Slurm
                 tasks requested.
@@ -127,11 +127,13 @@ class Experiment:
             max_concurrent_trials or self._backend.max_concurrent_trials
         )
 
+        trials = [Trial(cfg=cfg) for cfg in Sampler(self._cfg, n_trials)]
+
         _logger.info(
             dedent(
                 f"""\
                 Running the experiment '{self._name}' ({datetime.today().ctime()})
-                    - total number of trials: {n_trials}
+                    - total number of trials: {len(trials)}
                     - max number of concurrent trials: {max_concurrent_trials}
                 """
             )
@@ -140,7 +142,6 @@ class Experiment:
         self._start_time = time.time()
         time_of_last_summary = time.time()
 
-        trials = [Trial(cfg=self._parse(self._cfg)) for _ in range(n_trials)]
         scheduled_trials, running_trials, terminated_trials = copy(trials), [], []
 
         while len(terminated_trials) < n_trials:
@@ -195,26 +196,6 @@ class Experiment:
         )
 
         return self._database.read(experiment=self._name)
-
-    def _parse(self, cfg: Dict[str, Any]) -> Dict:
-        """Parse the cfg dict applying the search spaces.
-
-        Args:
-            cfg: The cfg dict with defined search spaces.
-
-        Returns:
-            A cfg dict sampled from the search space.
-        """
-        suggested_cfg = {}
-        for key, val in cfg.items():
-            if isinstance(val, Suggest):
-                suggested_cfg[key] = val()
-            elif isinstance(val, dict):
-                suggested_cfg[key] = self._parse(val)
-            else:
-                suggested_cfg[key] = val
-
-        return suggested_cfg
 
     def _print_summary(
         self,
