@@ -2,9 +2,16 @@
   <a href=""><img src="slurm_sweeps.png" alt="slurm sweeps logo" width="210"></a>
   <br>
   slurm sweeps
-  <br>
 </h1>
-<p align="center"> A simple tool to perform parameter sweeps on SLURM clusters. </p>
+<p align="center"><b>A simple tool to perform parameter sweeps on SLURM clusters.</b></p>
+<p align="center"> 
+  <a href="https://github.com/dcfidalgo/slurm_sweeps/blob/main/LICENSE">
+    <img alt="License" src="https://img.shields.io/github/license/dcfidalgo/slurm_sweeps.svg?color=blue">
+  </a>
+  <a href="https://app.codecov.io/gh/dcfidalgo/slurm_sweeps">
+    <img alt="Codecov" src="https://img.shields.io/codecov/c/gh/dcfidalgo/slurm_sweeps">
+  </a>
+</p>
 
 The main idea is to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) for
 [SLURM clusters](https://slurm.schedmd.com/overview.html) that is fully compatible with
