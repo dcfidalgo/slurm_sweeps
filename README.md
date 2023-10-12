@@ -1,4 +1,10 @@
-# slurm sweeps
+<h1 align="center">
+  <a href=""><img src="https://github.com/dcfidalgo/slurm_sweeps/blob/e9474afec8f56734547ba3a7d1b5491f2a49ca14/slurm_sweeps.jpeg" alt="slurm sweeps logo" width="150"></a>
+  <br>
+  slurm sweeps
+  <br>
+</h1>
+
 A simple tool to perform parameter sweeps on SLURM clusters.
 
 The main idea is to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) for
