@@ -1,11 +1,10 @@
 <h1 align="center">
-  <a href=""><img src="https://github.com/dcfidalgo/slurm_sweeps/blob/e9474afec8f56734547ba3a7d1b5491f2a49ca14/slurm_sweeps.jpeg" alt="slurm sweeps logo" width="150"></a>
+  <a href=""><img src="slurm_sweeps.png" alt="slurm sweeps logo" width="150"></a>
   <br>
   slurm sweeps
   <br>
 </h1>
-
-A simple tool to perform parameter sweeps on SLURM clusters.
+<p align="center"> A simple tool to perform parameter sweeps on SLURM clusters. </p>
 
 The main idea is to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) for
 [SLURM clusters](https://slurm.schedmd.com/overview.html) that is fully compatible with
@@ -16,7 +15,7 @@ However, on a SLURM cluster, these tools can be complicated to set up and introd
 
 *Slurm sweeps* is simple, lightweight, and has few dependencies.
 It uses SLURM Job Steps to run the individual trials.
-
+LICENSE
 ## Installation
 Clone the repo and install it via pip:
 
@@ -113,7 +112,7 @@ Run an HPO experiment using random search and the Asynchronous Successive Halvin
 **Arguments**:
 
 - `train` - A train function that takes as input a `cfg` dict.
-- `cfg` - A dict passed on to the `train` function.
+- `cfg` - A dict passed on to the `LICENSEtrain` function.
   It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
 - `name` - The name of the experiment.
 - `local_dir` - Where to store and run the experiments. In this directory
