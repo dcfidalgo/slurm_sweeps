@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href=""><img src="slurm_sweeps.png" alt="slurm sweeps logo" width="150"></a>
+  <a href=""><img src="slurm_sweeps.png" alt="slurm sweeps logo" width="210"></a>
   <br>
   slurm sweeps
   <br>
@@ -15,7 +15,7 @@ However, on a SLURM cluster, these tools can be complicated to set up and introd
 
 *Slurm sweeps* is simple, lightweight, and has few dependencies.
 It uses SLURM Job Steps to run the individual trials.
-LICENSE
+
 ## Installation
 Clone the repo and install it via pip:
 
