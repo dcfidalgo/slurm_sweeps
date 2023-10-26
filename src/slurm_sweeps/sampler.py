@@ -47,6 +47,16 @@ class LogUniform(Random):
 
 
 class Choice(Random):
+    """Sample uniformly from a list of choices.
+
+    Args:
+        choices: A list of choices to randomly sample from.
+        seed: A seed to initialize the RNG. If None, then fresh, unpredictable entropy will be pulled from the OS.
+
+    Raises:
+        AssertionError if the list of choices contains more then one type.
+    """
+
     def __init__(self, choices: List[Any], seed: Optional[int] = None):
         self._choices = choices
         self._type = type(choices[0])
