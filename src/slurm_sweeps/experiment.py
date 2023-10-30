@@ -17,12 +17,14 @@ from .constants import (
     DB_PATH,
     EXPERIMENT_NAME,
     ITERATION,
+    PATH_TO_DB,
     STORAGE_PATH,
     TRAIN_PKL,
     TRIAL_ID,
 )
 from .database import Database
 from .sampler import Sampler
+from .ssdb import SSDB
 from .storage import Storage
 from .trial import Status, Trial
 
@@ -53,7 +55,8 @@ class Experiment:
         train: Callable,
         cfg: Dict,
         name: str = "MySweep",
-        local_dir: str = "./slurm_sweeps",
+        path_to_db: str = "slurm_sweeps.db",
+        local_dir: str = "./slurm_sweeps_res",
         backend: Optional[Backend] = None,
         asha: Optional[ASHA] = None,
         database: Optional[Database] = None,
@@ -62,10 +65,12 @@ class Experiment:
     ):
         self._cfg = cfg
         self._name = name
+        self._path_to_db = str(Path(os.getcwd()) / path_to_db)
 
         storage_path = self._create_experiment_dir(
             Path(local_dir) / name, restore, exist_ok
         )
+
         self._storage = Storage(storage_path)
         self._storage.dump(train, TRAIN_PKL)
         if asha:
@@ -79,12 +84,28 @@ class Experiment:
             SlurmBackend() if SlurmBackend.is_available() else Backend()
         )
 
+        if SSDB.experiment_exists(self._path_to_db, self._name):
+            if not restore:
+                if exist_ok:
+                    SSDB.reset_table(self._path_to_db, self._name)
+                else:
+                    raise ValueError(
+                        f"""The experiment {self._name} already exists as a table in the DB. If you want to keep logging values to the existing table, re-run your experiment using 'restore=True'. Alternatively, you can choose to overwrite the existing table by re-running your experiment using 'exist_ok=TRUE'. BEWARE: DATA WILL BE LOST!"""
+                    )
+        else:
+            """
+            Not ecreating DB in experiment's dir (local_dir) since a DB should
+            harvest (deliver) data from (for) *any* experiment
+            """
+            SSDB.create_table(self._path_to_db, self._name)
+
         self._start_time: Optional[float] = None
 
         # setting env variables for the logger in the trials
         os.environ[EXPERIMENT_NAME] = name
         os.environ[STORAGE_PATH] = str(self._storage.path)
         os.environ[DB_PATH] = str(self._database.path)
+        os.environ[PATH_TO_DB] = self._path_to_db
 
     @staticmethod
     def _create_experiment_dir(
