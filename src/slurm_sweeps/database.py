@@ -1,4 +1,5 @@
 import json
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, Tuple, Union
 
@@ -6,12 +7,26 @@ import fasteners
 import pandas as pd
 
 
-class Database:
-    def __init__(
-        self,
-        path: Union[str, Path] = "./slurm_sweeps.db",
-    ):
+class DBObject(ABC):
+    def __init__(self, path: Union[str, Path] = "./database"):
         self._path = Path(path).resolve()
+
+    @abstractmethod
+    def create(self):
+        pass
+
+    @abstractmethod
+    def read(self):
+        pass
+
+    @abstractmethod
+    def write(self):
+        pass
+
+
+class FileDatabase(DBObject):
+    def __init__(self, path):
+        super().__init__(path)
         self._path.mkdir(parents=True, exist_ok=True)
 
     @property
