@@ -22,7 +22,7 @@ from .constants import (
     TRIAL_ID,
     WAITING_TIME_IN_SEC,
 )
-from .database import Database
+from .database import FileDatabase as Database
 from .sampler import Sampler
 from .storage import Storage
 from .trial import Status, Trial
