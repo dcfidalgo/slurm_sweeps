@@ -22,7 +22,7 @@ from .constants import (
     TRAIN_PKL,
     TRIAL_ID,
 )
-from .database import Database
+from .database import FileDatabase as Database
 from .sampler import Sampler
 from .ssdb import SSDB
 from .storage import Storage
@@ -83,21 +83,6 @@ class Experiment:
         self._backend = backend or (
             SlurmBackend() if SlurmBackend.is_available() else Backend()
         )
-
-        if SSDB.experiment_exists(self._path_to_db, self._name):
-            if not restore:
-                if exist_ok:
-                    SSDB.reset_table(self._path_to_db, self._name)
-                else:
-                    raise ValueError(
-                        f"""The experiment {self._name} already exists as a table in the DB. If you want to keep logging values to the existing table, re-run your experiment using 'restore=True'. Alternatively, you can choose to overwrite the existing table by re-running your experiment using 'exist_ok=TRUE'. BEWARE: DATA WILL BE LOST!"""
-                    )
-        else:
-            """
-            Not ecreating DB in experiment's dir (local_dir) since a DB should
-            harvest (deliver) data from (for) *any* experiment
-            """
-            SSDB.create_table(self._path_to_db, self._name)
 
         self._start_time: Optional[float] = None
 
