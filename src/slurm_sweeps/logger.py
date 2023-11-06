@@ -6,12 +6,10 @@ from .constants import (
     DB_PATH,
     EXPERIMENT_NAME,
     ITERATION,
-    PATH_TO_DB,
     STORAGE_PATH,
     TRIAL_ID,
 )
 from .database import FileDatabase as Database
-from .ssdb import SSDB
 from .storage import Storage
 from .trial import Trial
 
@@ -28,7 +26,6 @@ class Logger:
 
         self._experiment_name = os.environ[EXPERIMENT_NAME]
         self._database = Database(os.environ[DB_PATH])
-        # self._path_to_db = os.environ[PATH_TO_DB]
 
         try:
             storage = Storage(os.environ[STORAGE_PATH])
@@ -62,7 +59,8 @@ class Logger:
         )
         row[key] = value
 
-        self._database.write(self._experiment_name, row)
+        self._database.write(self._experiment_name, row, key, value)
+
         """
         SSDB.insert_log(
             self._path_to_db,
