@@ -17,14 +17,12 @@ from .constants import (
     DB_PATH,
     EXPERIMENT_NAME,
     ITERATION,
-    PATH_TO_DB,
     STORAGE_PATH,
     TRAIN_PKL,
     TRIAL_ID,
 )
 from .database import FileDatabase as Database
 from .sampler import Sampler
-from .ssdb import SSDB
 from .storage import Storage
 from .trial import Status, Trial
 
@@ -55,7 +53,6 @@ class Experiment:
         train: Callable,
         cfg: Dict,
         name: str = "MySweep",
-        path_to_db: str = "slurm_sweeps.db",
         local_dir: str = "./slurm_sweeps_res",
         backend: Optional[Backend] = None,
         asha: Optional[ASHA] = None,
@@ -65,7 +62,6 @@ class Experiment:
     ):
         self._cfg = cfg
         self._name = name
-        self._path_to_db = str(Path(os.getcwd()) / path_to_db)
 
         storage_path = self._create_experiment_dir(
             Path(local_dir) / name, restore, exist_ok
@@ -76,7 +72,7 @@ class Experiment:
         if asha:
             self._storage.dump(asha, ASHA_PKL)
 
-        self._database = database or Database(Path(local_dir) / ".database")
+        self._database = database or Database(Path(local_dir))
         if not restore:
             self._database.create(experiment=self._name, exist_ok=exist_ok)
 
@@ -86,11 +82,13 @@ class Experiment:
 
         self._start_time: Optional[float] = None
 
+        # print(str(self._database.path))
+        # self._database.write(self._name, {"iteration": 1, "trial_id": "bla"}, "loss", 1.9)
+
         # setting env variables for the logger in the trials
         os.environ[EXPERIMENT_NAME] = name
         os.environ[STORAGE_PATH] = str(self._storage.path)
         os.environ[DB_PATH] = str(self._database.path)
-        os.environ[PATH_TO_DB] = self._path_to_db
 
     @staticmethod
     def _create_experiment_dir(
