@@ -12,3 +12,6 @@ TRAIN_PKL = "train.pkl"
 TRAIN_PY = "train.py"
 CFG_YML = "cfg.yml"
 ASHA_PKL = "asha.pkl"
+
+# Configuration
+WAITING_TIME_IN_SEC = 0.01

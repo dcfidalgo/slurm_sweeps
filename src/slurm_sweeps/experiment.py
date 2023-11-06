@@ -6,7 +6,7 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import pandas as pd
 
@@ -20,6 +20,7 @@ from .constants import (
     STORAGE_PATH,
     TRAIN_PKL,
     TRIAL_ID,
+    WAITING_TIME_IN_SEC,
 )
 from .database import Database
 from .sampler import Sampler
@@ -123,12 +124,10 @@ class Experiment:
         Returns:
             A DataFrame of the database.
         """
+        trials = [Trial(cfg=cfg) for cfg in Sampler(self._cfg, n_trials)]
         max_concurrent_trials = (
             max_concurrent_trials or self._backend.max_concurrent_trials
         )
-
-        trials = [Trial(cfg=cfg) for cfg in Sampler(self._cfg, n_trials)]
-
         _logger.info(
             dedent(
                 f"""\
@@ -163,7 +162,7 @@ class Experiment:
 
                 continue
 
-            # check for completed trials
+            # check for terminated trials
             for trial in copy(running_trials):
                 if trial.terminated:
                     trial.end_time = time.time()
@@ -177,21 +176,19 @@ class Experiment:
                 self._print_summary(
                     running_trials + scheduled_trials + terminated_trials,
                     n_rows=nr_of_rows_in_summary,
-                    cfg_and_metrics_to_include=None
-                    if summarize_cfg_and_metrics is True
-                    else (summarize_cfg_and_metrics or []),
+                    summarize_cfg_and_metrics=summarize_cfg_and_metrics,
                 )
                 time_of_last_summary = time.time()
 
-            time.sleep(0.1)
+            # wait if the maximum nr of concurrent trials are running, or wait for the last trials to finish
+            if len(running_trials) == max_concurrent_trials or trial_nr == n_trials:
+                time.sleep(WAITING_TIME_IN_SEC)
 
         # final summary
         self._print_summary(
             terminated_trials,
             n_rows=None,
-            cfg_and_metrics_to_include=None
-            if summarize_cfg_and_metrics is True
-            else (summarize_cfg_and_metrics or []),
+            summarize_cfg_and_metrics=summarize_cfg_and_metrics,
             sort_by="RUNTIME",
         )
 
@@ -201,7 +198,7 @@ class Experiment:
         self,
         trials: List[Trial],
         n_rows: Optional[int] = None,
-        cfg_and_metrics_to_include: Optional[List[str]] = None,
+        summarize_cfg_and_metrics: Union[bool, List[str]] = True,
         sort_by: Optional[str] = None,
     ):
         _logger.info("\n=== Status ===")
@@ -239,10 +236,12 @@ class Experiment:
         # add database info
         database = self._database.read(experiment=self._name)
         if not database.empty:
-            if cfg_and_metrics_to_include is None:
-                cfg_and_metrics_to_include = [
+            if summarize_cfg_and_metrics is True:
+                summarize_cfg_and_metrics = [
                     col for col in database.columns if col not in [ITERATION, TRIAL_ID]
                 ]
+            elif summarize_cfg_and_metrics is False:
+                summarize_cfg_and_metrics = []
 
             for trial_dict in summary_dicts:
                 id_mask = database[TRIAL_ID] == trial_dict["TRIAL_ID"]
@@ -251,7 +250,7 @@ class Experiment:
                     continue
 
                 trial_dict["ITERATION"] = trial_df.iloc[-1][ITERATION]
-                for key in cfg_and_metrics_to_include:
+                for key in summarize_cfg_and_metrics:
                     trial_dict[key] = trial_df.iloc[-1][key]
 
         summary_df = pd.DataFrame(summary_dicts).set_index("TRIAL_ID")
