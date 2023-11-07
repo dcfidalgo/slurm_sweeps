@@ -80,8 +80,10 @@ python train.py
     running = True
     while running:
         squeue = subprocess.check_output(["squeue", "--me"])
+        print(squeue.decode())
         if "train" not in squeue.decode():
             running = False
+        sleep(1)
 
     dataframe = Database(local_dir / "slurm_sweeps.db").read("MySweep")
 
