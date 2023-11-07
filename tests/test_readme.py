@@ -75,7 +75,7 @@ python train.py
     running = True
     while running:
         squeue = subprocess.check_output(["squeue", "--me"])
-        if "train" not in squeue:
+        if "train" not in squeue.decode():
             running = False
 
     dataframe = Database(local_dir / "slurm_sweeps.db").read("MySweep")
