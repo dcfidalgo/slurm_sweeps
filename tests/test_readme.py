@@ -85,6 +85,8 @@ python train.py
             running = False
         sleep(1)
 
+    print(list(tmp_path.iterdir()))
+
     dataframe = Database(local_dir / "slurm_sweeps.db").read("MySweep")
 
     assert len(dataframe) > 20
