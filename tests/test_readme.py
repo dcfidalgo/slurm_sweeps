@@ -52,7 +52,7 @@ def train(cfg):
 
 experiment = ss.Experiment(
     train=train,
-    local_dir={local_dir},
+    local_dir="{local_dir}",
     cfg={{
         "parameter": ss.Uniform(0, 2),
     }},
