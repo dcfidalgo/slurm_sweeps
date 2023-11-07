@@ -7,7 +7,12 @@ import slurm_sweeps as ss
 from slurm_sweeps import Database, SlurmBackend
 
 
-def test_readme_example_on_local(tmp_path):
+def test_readme_example_on_local(tmp_path, monkeypatch):
+    if SlurmBackend.is_available():
+        monkeypatch.setattr(
+            "slurm_sweeps.experiment.SlurmBackend.is_available", lambda: False
+        )
+
     def train(cfg):
         logger = ss.Logger(cfg)
         for epoch in range(1, 10):
