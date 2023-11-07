@@ -86,7 +86,7 @@ python train.py
         sleep(1)
 
     print(list(tmp_path.iterdir()))
-    out = subprocess.check_output(["cat", "slurm*.out"], cwd=tmp_path)
+    out = subprocess.check_output(["cat", "slurm-3.out"], cwd=tmp_path)
     print(out.decode())
 
     dataframe = Database(local_dir / "slurm_sweeps.db").read("MySweep")
