@@ -78,7 +78,7 @@ class Experiment:
             self._database.create(experiment=self._name, exist_ok=exist_ok)
 
         self._backend = backend or (
-            SlurmBackend() if SlurmBackend.is_available() else Backend()
+            SlurmBackend() if SlurmBackend.is_running() else Backend()
         )
 
         self._start_time: Optional[float] = None
