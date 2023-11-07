@@ -8,10 +8,9 @@ on:
 
 jobs:
 
-  test:
+  tests:
     runs-on: ubuntu-latest
-    # For the action to work, you have to supply a mysql
-    # service as defined below.
+    # For the slurm action to work, you have to supply a mysql service as defined below.
     services:
       mysql:
         image: mysql:8.0
