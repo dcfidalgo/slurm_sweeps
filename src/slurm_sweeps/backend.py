@@ -99,11 +99,12 @@ class SlurmBackend(Backend):
         return slurm_cmd + super()._build_args(train_path, cfg_path)
 
     @staticmethod
-    def is_available() -> bool:
-        """Is a slurm cluster available?"""
+    def is_running() -> bool:
+        """Are we running inside an `sbatch` call?"""
         try:
             subprocess.check_output(["sinfo"])
-        except (FileNotFoundError, subprocess.CalledProcessError):
+            assert hasattr(os.environ, "SLURM_NTASKS")
+        except (FileNotFoundError, subprocess.CalledProcessError, AssertionError):
             return False
         else:
             return True

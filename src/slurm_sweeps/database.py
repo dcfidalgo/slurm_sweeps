@@ -9,7 +9,7 @@ import pandas as pd
 class Database:
     def __init__(
         self,
-        path: Union[str, Path] = "./database",
+        path: Union[str, Path] = "./slurm_sweeps.db",
     ):
         self._path = Path(path).resolve()
         self._path.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,7 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import pandas as pd
 
@@ -20,6 +20,7 @@ from .constants import (
     STORAGE_PATH,
     TRAIN_PKL,
     TRIAL_ID,
+    WAITING_TIME_IN_SEC,
 )
 from .database import Database
 from .sampler import Sampler
@@ -53,7 +54,7 @@ class Experiment:
         train: Callable,
         cfg: Dict,
         name: str = "MySweep",
-        local_dir: str = "./slurm_sweeps",
+        local_dir: Union[str, Path] = "./slurm_sweeps",
         backend: Optional[Backend] = None,
         asha: Optional[ASHA] = None,
         database: Optional[Database] = None,
@@ -62,21 +63,22 @@ class Experiment:
     ):
         self._cfg = cfg
         self._name = name
+        self._local_dir = Path(local_dir)
 
         storage_path = self._create_experiment_dir(
-            Path(local_dir) / name, restore, exist_ok
+            self._local_dir / name, restore, exist_ok
         )
         self._storage = Storage(storage_path)
         self._storage.dump(train, TRAIN_PKL)
         if asha:
             self._storage.dump(asha, ASHA_PKL)
 
-        self._database = database or Database(Path(local_dir) / ".database")
+        self._database = database or Database(self._local_dir / "slurm_sweeps.db")
         if not restore:
             self._database.create(experiment=self._name, exist_ok=exist_ok)
 
         self._backend = backend or (
-            SlurmBackend() if SlurmBackend.is_available() else Backend()
+            SlurmBackend() if SlurmBackend.is_running() else Backend()
         )
 
         self._start_time: Optional[float] = None
@@ -123,21 +125,11 @@ class Experiment:
         Returns:
             A DataFrame of the database.
         """
+        trials = [Trial(cfg=cfg) for cfg in Sampler(self._cfg, n_trials)]
         max_concurrent_trials = (
             max_concurrent_trials or self._backend.max_concurrent_trials
         )
-
-        trials = [Trial(cfg=cfg) for cfg in Sampler(self._cfg, n_trials)]
-
-        _logger.info(
-            dedent(
-                f"""\
-                Running the experiment '{self._name}' ({datetime.today().ctime()})
-                    - total number of trials: {len(trials)}
-                    - max number of concurrent trials: {max_concurrent_trials}
-                """
-            )
-        )
+        self._print_run_info(len(trials), max_concurrent_trials)
 
         self._start_time = time.time()
         time_of_last_summary = time.time()
@@ -149,62 +141,78 @@ class Experiment:
 
             # run trial
             if (trial_nr < n_trials) and (len(running_trials) < max_concurrent_trials):
-                trial = trials[trial_nr]
-
-                _logger.debug(
-                    f"{trial_nr + 1}/{n_trials} run trial {trial.trial_id} with config:\n\t{trial.cfg}"
-                )
-
-                trial.process = self._backend.run(trial, self._storage)
-                trial.start_time = time.time()
+                trial = self._run_trial(trials, trial_nr)
 
                 running_trials.append(trial)
                 scheduled_trials.remove(trial)
 
                 continue
 
-            # check for completed trials
+            # check for terminated trials
             for trial in copy(running_trials):
                 if trial.terminated:
                     trial.end_time = time.time()
+
                     _logger.debug(f"trial {trial.trial_id} {trial.status.value}")
 
                     terminated_trials.append(trial)
                     running_trials.remove(trial)
 
-            # print summary
+            # print current summary
             if (time.time() - time_of_last_summary) > summary_interval_in_sec:
                 self._print_summary(
                     running_trials + scheduled_trials + terminated_trials,
                     n_rows=nr_of_rows_in_summary,
-                    cfg_and_metrics_to_include=None
-                    if summarize_cfg_and_metrics is True
-                    else (summarize_cfg_and_metrics or []),
+                    summarize_cfg_and_metrics=summarize_cfg_and_metrics,
                 )
                 time_of_last_summary = time.time()
 
-            time.sleep(0.1)
+            # wait if the maximum nr of concurrent trials are running, or wait for the last trials to finish
+            if len(running_trials) == max_concurrent_trials or trial_nr == n_trials:
+                time.sleep(WAITING_TIME_IN_SEC)
 
-        # final summary
+        # print final summary
         self._print_summary(
             terminated_trials,
             n_rows=None,
-            cfg_and_metrics_to_include=None
-            if summarize_cfg_and_metrics is True
-            else (summarize_cfg_and_metrics or []),
+            summarize_cfg_and_metrics=summarize_cfg_and_metrics,
             sort_by="RUNTIME",
         )
 
         return self._database.read(experiment=self._name)
 
+    def _run_trial(self, trials: List[Trial], trial_nr: int) -> Trial:
+        trial = trials[trial_nr]
+
+        _logger.debug(
+            f"{trial_nr}/{len(trials)}: run trial {trial.trial_id} with config:\n\t{trial.cfg}"
+        )
+
+        trial.process = self._backend.run(trial, self._storage)
+        trial.start_time = time.time()
+
+        return trial
+
+    def _print_run_info(self, nr_trials: int, max_concurrent_trials: int):
+        _logger.info(
+            dedent(
+                f"""\
+                Running the experiment '{self._name}' ({datetime.today().ctime()})
+                    - total number of trials: {nr_trials}
+                    - max number of concurrent trials: {max_concurrent_trials}
+                """
+            )
+        )
+
     def _print_summary(
         self,
         trials: List[Trial],
         n_rows: Optional[int] = None,
-        cfg_and_metrics_to_include: Optional[List[str]] = None,
+        summarize_cfg_and_metrics: Union[bool, List[str]] = True,
         sort_by: Optional[str] = None,
     ):
         _logger.info("\n=== Status ===")
+
         elapsed_time = time.time() - self._start_time
         nr_of_ct, nr_of_pt, nr_of_rt, nr_of_st = 0, 0, 0, 0
         for trial in trials:
@@ -239,10 +247,12 @@ class Experiment:
         # add database info
         database = self._database.read(experiment=self._name)
         if not database.empty:
-            if cfg_and_metrics_to_include is None:
-                cfg_and_metrics_to_include = [
+            if summarize_cfg_and_metrics is True:
+                summarize_cfg_and_metrics = [
                     col for col in database.columns if col not in [ITERATION, TRIAL_ID]
                 ]
+            elif summarize_cfg_and_metrics is False:
+                summarize_cfg_and_metrics = []
 
             for trial_dict in summary_dicts:
                 id_mask = database[TRIAL_ID] == trial_dict["TRIAL_ID"]
@@ -251,12 +261,15 @@ class Experiment:
                     continue
 
                 trial_dict["ITERATION"] = trial_df.iloc[-1][ITERATION]
-                for key in cfg_and_metrics_to_include:
+                for key in summarize_cfg_and_metrics:
                     trial_dict[key] = trial_df.iloc[-1][key]
 
         summary_df = pd.DataFrame(summary_dicts).set_index("TRIAL_ID")
+
         if sort_by is not None:
             summary_df = summary_df.sort_values(sort_by)
+
         _logger.info(summary_df.head(n_rows).to_string())
+
         if n_rows is not None and n_rows < len(summary_df):
             _logger.info(f"... {len(summary_df) - n_rows} trials not displayed!")
