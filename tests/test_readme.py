@@ -93,3 +93,5 @@ python train.py
 
     assert len(dataframe) > 20
     assert dataframe["iteration"].sort_values().iloc[-1] == 9
+
+    assert False
