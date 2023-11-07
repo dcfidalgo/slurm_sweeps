@@ -21,7 +21,7 @@ from .constants import (
     TRAIN_PKL,
     TRIAL_ID,
 )
-from .database import FileDatabase as Database
+from .database import SQLDatabase as Database
 from .sampler import Sampler
 from .storage import Storage
 from .trial import Status, Trial
@@ -72,7 +72,7 @@ class Experiment:
         if asha:
             self._storage.dump(asha, ASHA_PKL)
 
-        self._database = database or Database(Path(local_dir))
+        self._database = database or Database(Path(local_dir) / "database.db")
         if not restore:
             self._database.create(experiment=self._name, exist_ok=exist_ok)
 

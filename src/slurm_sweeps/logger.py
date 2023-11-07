@@ -9,7 +9,7 @@ from .constants import (
     STORAGE_PATH,
     TRIAL_ID,
 )
-from .database import FileDatabase as Database
+from .database import SQLDatabase as Database
 from .storage import Storage
 from .trial import Trial
 
@@ -60,17 +60,6 @@ class Logger:
         row[key] = value
 
         self._database.write(self._experiment_name, row, key, value)
-
-        """
-        SSDB.insert_log(
-            self._path_to_db,
-            self._experiment_name,
-            self._trial.trial_id,
-            iteration,
-            key,
-            value,
-        )
-        """
 
         if self._asha is not None:
             db = self._database.read(self._experiment_name)

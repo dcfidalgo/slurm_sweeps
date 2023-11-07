@@ -29,6 +29,7 @@ class DBObject(ABC):
 class FileDatabase(DBObject):
     def __init__(self, path):
         super().__init__(path)
+        self._path.mkdir(parents=True, exist_ok=True)
 
     @property
     def path(self) -> Path:
@@ -85,25 +86,21 @@ class SQLDatabase(DBObject):
 
     @property
     def path(self) -> Path:
-        return self._path / "database.db"
+        return self._path
 
     def generateCreateQuery(self, table_name):
-        return (
-            """CREATE TABLE """
-            + table_name
-            + """ (
+        return f"""CREATE TABLE {table_name} (
                     trial_id        TEXT,
                     timestamp       TEXT,
                     iteration       NUMERIC,
                     logged_by_user  TEXT
                 );
             """
-        )
 
     def create(self, experiment: str, exist_ok: bool = False):
         with DBConnection(self.path) as conn:
             if exist_ok:
-                conn.execute("DROP TABLE IF EXISTS " + experiment + ";")
+                conn.execute(f"DROP TABLE IF EXISTS {experiment};")
 
             query = self.generateCreateQuery(experiment)
             conn.execute(query)
@@ -120,10 +117,8 @@ class SQLDatabase(DBObject):
             user_log = json.dumps({key: value})
 
             conn.execute(
-                f"""INSERT INTO """
-                + experiment
-                + """
-                         (trial_id, timestamp, iteration, logged_by_user)
-                         VALUES (?, ?, ?, ?);""",
+                f"""INSERT INTO {experiment}
+                (trial_id, timestamp, iteration, logged_by_user)
+                VALUES (?, ?, ?, ?);""",
                 (trial_id, timestamp, iteration, user_log),
             )
