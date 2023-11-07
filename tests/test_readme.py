@@ -4,15 +4,19 @@ from time import sleep
 import pytest
 
 import slurm_sweeps as ss
-from slurm_sweeps import Database, SlurmBackend
+from slurm_sweeps import Database
 
 
-def test_readme_example_on_local(tmp_path, monkeypatch):
-    if SlurmBackend.is_available():
-        monkeypatch.setattr(
-            "slurm_sweeps.experiment.SlurmBackend.is_available", lambda: False
-        )
+def is_slurm_available() -> bool:
+    try:
+        subprocess.check_output(["sinfo"])
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+    else:
+        return True
 
+
+def test_readme_example_on_local(tmp_path):
     def train(cfg):
         logger = ss.Logger(cfg)
         for epoch in range(1, 10):
@@ -37,7 +41,7 @@ def test_readme_example_on_local(tmp_path, monkeypatch):
     assert dataframe["iteration"].sort_values().iloc[-1] == 9
 
 
-@pytest.mark.skipif(not SlurmBackend.is_available(), reason="requires a SLURM cluster")
+@pytest.mark.skipif(not is_slurm_available(), reason="requires a SLURM cluster")
 def test_readme_example_on_slurm(tmp_path):
     local_dir = tmp_path / "slurm_sweeps"
 
