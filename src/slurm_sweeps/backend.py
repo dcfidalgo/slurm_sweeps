@@ -70,6 +70,8 @@ class Backend:
 class SlurmBackend(Backend):
     """Execute the training runs on a Slurm cluster via `srun`.
 
+    Pass an instance of this class to your experiment.
+
     Args:
         exclusive: Add the `--exclusive` switch.
         nodes: How many nodes do you request for your srun?

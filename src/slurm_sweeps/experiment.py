@@ -31,10 +31,10 @@ _logger = logging.getLogger(__name__)
 
 
 class Experiment:
-    """Run an HPO experiment using random search and the Asynchronous Successive Halving Algorithm (ASHA).
+    """Set up an HPO experiment.
 
     Args:
-        train: A train function that takes as input a `cfg` dict.
+        train: A train function that takes as input the `cfg` dict.
         cfg: A dict passed on to the `train` function.
             It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
         name: The name of the experiment.

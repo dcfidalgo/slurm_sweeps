@@ -102,10 +102,11 @@ See the `tests` folder for an advanced example of training a PyTorch model with 
 
 ```python
 def __init__(
+    self,
     train: Callable,
     cfg: Dict,
     name: str = "MySweep",
-    local_dir: Union[str, Path] = "./slurm_sweeps.db",
+    local_dir: Union[str, Path] = "./slurm_sweeps",
     backend: Optional[Backend] = None,
     asha: Optional[ASHA] = None,
     database: Optional[Database] = None,
@@ -114,12 +115,12 @@ def __init__(
 )
 ```
 
-Run an HPO experiment using random search and the Asynchronous Successive Halving Algorithm (ASHA).
+Set up an HPO experiment.
 
 **Arguments**:
 
-- `train` - A train function that takes as input a `cfg` dict.
-- `cfg` - A dict passed on to the `LICENSEtrain` function.
+- `train` - A train function that takes as input the `cfg` dict.
+- `cfg` - A dict passed on to the `train` function.
   It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
 - `name` - The name of the experiment.
 - `local_dir` - Where to store and run the experiments. In this directory
@@ -128,29 +129,28 @@ Run an HPO experiment using random search and the Asynchronous Successive Halvin
   otherwise we choose the standard `Backend` that simply executes the trial in another process.
 - `asha` - An optional ASHA instance to cancel less promising trials. By default, it is None.
 - `database` - A database instance to store the trial's (intermediate) results.
-  By default, it will create the database at `{local_dir}/.database'.
+  By default, we will create the database at `{local_dir}/slurm_sweeps.db`.
 - `restore` - Restore an experiment with the same name?
-- `exist_ok` - Replace an existing experiment with the same name?
-
-<a id="slurm_sweeps.experiment.Experiment.run"></a>
+- `overwrite` - Overwrite an existing experiment with the same name?
 
 #### `Experiment.run`
 
 ```python
 def run(
+    self,
     n_trials: int = 1,
     max_concurrent_trials: Optional[int] = None,
     summary_interval_in_sec: float = 5.0,
     nr_of_rows_in_summary: int = 10,
-    summarize_cfg_and_metrics: Union[bool, List[str]] = True
-) -> pandas.DataFrame
+    summarize_cfg_and_metrics: Union[bool, List[str]] = True,
+) -> pd.DataFrame
 ```
 
 Run the experiment.
 
 **Arguments**:
 
-- `n_trials` - Number of trials to run.
+- `n_trials` - Number of trials to run. For grid searches this parameter is ignored.
 - `max_concurrent_trials` - The maximum number of trials running concurrently. By default, we will set this to
   the number of cpus available, or the number of total Slurm tasks divided by the number of trial Slurm
   tasks requested.
@@ -159,10 +159,32 @@ Run the experiment.
 - `summarize_cfg_and_metrics` - Should we include the cfg and the metrics in the summary table?
   You can also pass in a list of strings to only select a few cfg and metric keys.
 
-
 **Returns**:
 
   A DataFrame of the database.
+
+### `CLASS slurm_sweeps.SlurmBackend`
+
+```python
+def __init__(
+    self,
+    exclusive: bool = True,
+    nodes: int = 1,
+    ntasks: int = 1,
+    args: str = ""
+)
+```
+
+Execute the training runs on a Slurm cluster via `srun`.
+
+Pass an instance of this class to your experiment.
+
+**Arguments**:
+
+- `exclusive` - Add the `--exclusive` switch.
+- `nodes` - How many nodes do you request for your srun?
+- `ntasks` - How many tasks do you request for your srun?
+- `args` - Additional command line arguments for srun, formatted as a string.
 
 ## Contact
 David Carreto Fidalgo (david.carreto.fidalgo@mpcdf.mpg.de)
