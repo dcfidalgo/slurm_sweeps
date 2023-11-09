@@ -4,9 +4,11 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
+
+from .constants import CFG, ITERATION, TIMESTAMP, TRIAL_ID
 
 try:
     import fasteners
@@ -71,8 +73,8 @@ class FileDatabase(Database):
         with path.open():
             pass
 
-        row["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        json_str = json.dumps(row, sort_keys=True)
+        row[TIMESTAMP] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        json_str = json.dumps(row)
 
         lock.acquire_write_lock()
         with path.open(mode="a") as f:
@@ -88,7 +90,7 @@ class FileDatabase(Database):
         return database_df
 
 
-class SQLDatabase(Database):
+class SqlDatabase(Database):
     def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
         super().__init__(path)
         if not self.path.exists():
@@ -110,9 +112,10 @@ class SQLDatabase(Database):
             try:
                 con.execute(
                     f"create table {experiment}("
-                    f"timestamp datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),"
-                    f"trial_id text,"
-                    f"iteration numeric);"
+                    f"{TIMESTAMP} datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),"
+                    f"{TRIAL_ID} text,"
+                    f"{ITERATION} integer,"
+                    f"{CFG} text);"
                 )
             except sqlite3.OperationalError as err:
                 if "already exists" in str(err):
@@ -122,12 +125,12 @@ class SQLDatabase(Database):
     def write(self, experiment: str, row: Dict):
         with self._connection() as con:
             # add missing columns
-            missing_columns = self._get_missing_columns(con, experiment, row)
-            for col in missing_columns:
+            missing_columns_and_types = self._get_missing_columns_and_types(
+                con, experiment, row
+            )
+            for col, typ in missing_columns_and_types:
                 try:
-                    con.execute(
-                        f"alter table {experiment} add column {col} numeric default missing"
-                    )
+                    con.execute(f"alter table {experiment} add column {col} {typ}")
                 # Just as a safeguard, during tests I sometimes encountered this error ...
                 except sqlite3.OperationalError as err:
                     if "duplicate column name" not in str(err):
@@ -141,20 +144,34 @@ class SQLDatabase(Database):
             )
 
     @staticmethod
-    def _get_missing_columns(
+    def _get_missing_columns_and_types(
         connection: sqlite3.Connection, experiment: str, row: Dict
-    ):
+    ) -> List[Tuple[str, str]]:
+        def get_sql_type(value: Union[float, int]) -> str:
+            if type(value) is int:
+                return "integer"
+            if type(value) is float:
+                return "real"
+            return "numeric"
+
         response = connection.execute(f"pragma table_info({experiment})").fetchall()
         existing_columns = [col[1].lower() for col in response]
         missing_columns = [
-            col.lower() for col in row.keys() if col.lower() not in existing_columns
+            (col.lower(), get_sql_type(val))
+            for col, val in row.items()
+            if col.lower() not in existing_columns
         ]
 
         return missing_columns
 
     def read(self, experiment: str) -> pd.DataFrame:
         with self._connection() as con:
-            return pd.read_sql_query(f"select * from {experiment};", con)
+            df = pd.read_sql(f"select * from {experiment};", con)
+            # If a whole column only contains nan, the df will contain None
+            # https://github.com/pandas-dev/pandas/issues/14314
+            if None in df.values:
+                df = df.replace([None], float("nan"))
+            return df
 
 
 class ExperimentExistsError(Exception):

@@ -2,7 +2,7 @@ import logging
 
 from .asha import ASHA
 from .backend import Backend, SlurmBackend
-from .database import FileDatabase, SQLDatabase
+from .database import FileDatabase, SqlDatabase
 from .experiment import Experiment
 from .logger import Logger
 from .sampler import Choice, Grid, LogUniform, Uniform

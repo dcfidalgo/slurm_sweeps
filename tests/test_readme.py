@@ -4,7 +4,8 @@ from time import sleep
 import pytest
 
 import slurm_sweeps as ss
-from slurm_sweeps import Database
+from slurm_sweeps import SqlDatabase
+from slurm_sweeps.constants import ITERATION
 
 
 def is_slurm_available() -> bool:
@@ -22,7 +23,7 @@ def test_readme_example_on_local(tmp_path):
         for epoch in range(1, 10):
             sleep(0.5)
             loss = (cfg["parameter"] - 1) ** 2 * epoch
-            logger.log("loss", loss, epoch)
+            logger.log({"loss": loss}, epoch)
 
     experiment = ss.Experiment(
         train=train,
@@ -38,11 +39,12 @@ def test_readme_example_on_local(tmp_path):
     print(f"\nBest trial:\n{dataframe.sort_values('loss').iloc[0]}")
 
     assert len(dataframe) > 10
-    assert dataframe["iteration"].sort_values().iloc[-1] == 9
+    assert dataframe[ITERATION].sort_values().iloc[-1] == 9
 
 
 @pytest.mark.skipif(not is_slurm_available(), reason="requires a SLURM cluster")
 def test_readme_example_on_slurm(tmp_path):
+    """This test is meant for our CI on GitHub where we set up a SLURM cluster"""
     local_dir = tmp_path / "slurm_sweeps"
 
     python_script = f"""import slurm_sweeps as ss
@@ -53,7 +55,7 @@ def train(cfg):
     for epoch in range(1, 10):
         sleep(0.5)
         loss = (cfg["parameter"] - 1) ** 2 * epoch
-        logger.log("loss", loss, epoch)
+        logger.log({{"loss": loss}}, epoch)
 
 experiment = ss.Experiment(
     train=train,
@@ -92,8 +94,8 @@ python train.py
 
     # check output
     job_out = subprocess.check_output(["cat", "slurm-3.out"], cwd=tmp_path)
-    dataframe = Database(local_dir / "slurm_sweeps.db").read("MySweep")
+    dataframe = SqlDatabase(local_dir / "slurm_sweeps.db").read("MySweep")
 
     assert "max number of concurrent trials: 2" in job_out.decode()
     assert len(dataframe) > 10
-    assert dataframe["iteration"].sort_values().iloc[-1] == 9
+    assert dataframe[ITERATION].sort_values().iloc[-1] == 9
