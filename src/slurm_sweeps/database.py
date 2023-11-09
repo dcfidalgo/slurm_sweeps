@@ -1,38 +1,52 @@
+import abc
 import datetime
 import json
-import sqlite3 as sl
-from abc import ABC, abstractmethod
+import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Tuple, Union
 
-import fasteners
 import pandas as pd
 
+try:
+    import fasteners
+except ModuleNotFoundError:
+    _has_fasteners = False
+else:
+    _has_fasteners = True
 
-class DBObject(ABC):
-    def __init__(self, path: Union[str, Path]):
+
+class Database(abc.ABC):
+    def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
         self._path = Path(path).resolve()
 
-    @abstractmethod
-    def create(self):
-        pass
-
-    @abstractmethod
-    def read(self):
-        pass
-
-    @abstractmethod
-    def write(self):
-        pass
-
-
-class FileDatabase(DBObject):
-    def __init__(self, path):
-        super().__init__(path)
-
     @property
-    def path(self) -> Path:
+    def path(self):
         return self._path
+
+    @abc.abstractmethod
+    def create(self, experiment: str, overwrite: bool = False):
+        pass
+
+    @abc.abstractmethod
+    def write(self, experiment: str, row: Dict):
+        pass
+
+    @abc.abstractmethod
+    def read(self, experiment: str) -> pd.DataFrame:
+        pass
+
+
+class FileDatabase(Database):
+    def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
+        if not _has_fasteners:
+            raise ModuleNotFoundError(
+                "You need to install 'fasteners' to use the FileDatabase: "
+                "`pip install fasteners`"
+            )
+
+        super().__init__(path=path)
+        self.path.mkdir(parents=True, exist_ok=True)
 
     def _get_file_path_and_lock(
         self, experiment
@@ -42,15 +56,22 @@ class FileDatabase(DBObject):
 
         return path, lock
 
-    def create(self, experiment: str, exist_ok: bool = False):
+    def create(self, experiment: str, overwrite: bool = False):
         path, _ = self._get_file_path_and_lock(experiment)
-        path.touch(exist_ok=exist_ok)
+        try:
+            path.touch(exist_ok=overwrite)
+        except FileExistsError as err:
+            raise ExperimentExistsError(experiment) from err
         with path.open(mode="w"):
             pass
 
-    def write(self, experiment: str, row: Dict, key: str = None, value=None):
+    def write(self, experiment: str, row: Dict):
         path, lock = self._get_file_path_and_lock(experiment)
+        # quick check if file exists
+        with path.open():
+            pass
 
+        row["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         json_str = json.dumps(row, sort_keys=True)
 
         lock.acquire_write_lock()
@@ -67,63 +88,79 @@ class FileDatabase(DBObject):
         return database_df
 
 
-class DBConnection(object):
-    def __init__(self, path):
-        self.path = path
-
-    def __enter__(self):
-        self.conn = sl.connect(self.path, isolation_level=None)
-        return self.conn
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.conn.close()
-
-
-class SQLDatabase(DBObject):
-    def __init__(self, path):
+class SQLDatabase(Database):
+    def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
         super().__init__(path)
+        if not self.path.exists():
+            with self._connection() as con:
+                con.execute("vacuum")
 
-    @property
-    def path(self) -> Path:
-        return self._path / "database.db"
+    @contextmanager
+    def _connection(self):
+        connection = sqlite3.connect(self.path, isolation_level=None)
+        try:
+            yield connection
+        finally:
+            connection.close()
 
-    def generateCreateQuery(self, table_name):
-        return (
-            """CREATE TABLE """
-            + table_name
-            + """ (
-                    trial_id        TEXT,
-                    timestamp       TEXT,
-                    iteration       NUMERIC,
-                    logged_by_user  TEXT
-                );
-            """
-        )
+    def create(self, experiment: str, overwrite: bool = False):
+        with self._connection() as con:
+            if overwrite:
+                con.execute(f"drop table if exists {experiment};")
+            try:
+                con.execute(
+                    f"create table {experiment}("
+                    f"timestamp datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),"
+                    f"trial_id text,"
+                    f"iteration numeric);"
+                )
+            except sqlite3.OperationalError as err:
+                if "already exists" in str(err):
+                    raise ExperimentExistsError(experiment) from err
+                raise err
 
-    def create(self, experiment: str, exist_ok: bool = False):
-        with DBConnection(self.path) as conn:
-            if exist_ok:
-                conn.execute("DROP TABLE IF EXISTS " + experiment + ";")
+    def write(self, experiment: str, row: Dict):
+        with self._connection() as con:
+            # add missing columns
+            missing_columns = self._get_missing_columns(con, experiment, row)
+            for col in missing_columns:
+                try:
+                    con.execute(
+                        f"alter table {experiment} add column {col} numeric default missing"
+                    )
+                # Just as a safeguard, during tests I sometimes encountered this error ...
+                except sqlite3.OperationalError as err:
+                    if "duplicate column name" not in str(err):
+                        raise err
 
-            query = self.generateCreateQuery(experiment)
-            conn.execute(query)
+            # insert row
+            con.execute(
+                f"insert into {experiment} "
+                f"({', '.join(row.keys())}) values ({', '.join(['?' for _ in range(len(row))])});",
+                list(row.values()),
+            )
+
+    @staticmethod
+    def _get_missing_columns(
+        connection: sqlite3.Connection, experiment: str, row: Dict
+    ):
+        response = connection.execute(f"pragma table_info({experiment})").fetchall()
+        existing_columns = [col[1].lower() for col in response]
+        missing_columns = [
+            col.lower() for col in row.keys() if col.lower() not in existing_columns
+        ]
+
+        return missing_columns
 
     def read(self, experiment: str) -> pd.DataFrame:
-        with DBConnection(self.path) as conn:
-            return pd.read_sql_query(f"SELECT * FROM {experiment};", conn)
+        with self._connection() as con:
+            return pd.read_sql_query(f"select * from {experiment};", con)
 
-    def write(self, experiment: str, data: Dict, key: str = None, value=None):
-        with DBConnection(self.path) as conn:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            trial_id = data["trial_id"]
-            iteration = data["iteration"]
-            user_log = json.dumps({key: value})
 
-            conn.execute(
-                f"""INSERT INTO """
-                + experiment
-                + """
-                         (trial_id, timestamp, iteration, logged_by_user)
-                         VALUES (?, ?, ?, ?);""",
-                (trial_id, timestamp, iteration, user_log),
-            )
+class ExperimentExistsError(Exception):
+    def __init__(self, experiment: str, *args, **kwargs):
+        msg = (
+            f"An experiment with the name '{experiment}' already exists."
+            f"\n\tYou can overwrite it by setting 'overwrite=True'."
+        )
+        super().__init__(msg, *args, **kwargs)

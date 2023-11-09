@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Dict
 
 from .constants import (
@@ -9,7 +10,7 @@ from .constants import (
     STORAGE_PATH,
     TRIAL_ID,
 )
-from .database import FileDatabase as Database
+from .database import FileDatabase, SQLDatabase
 from .storage import Storage
 from .trial import Trial
 
@@ -25,7 +26,12 @@ class Logger:
         self._trial = Trial(cfg=cfg)
 
         self._experiment_name = os.environ[EXPERIMENT_NAME]
-        self._database = Database(os.environ[DB_PATH])
+        if Path(os.environ[DB_PATH]).is_dir():
+            self._database = FileDatabase(os.environ[DB_PATH])
+        elif Path(os.environ[DB_PATH]).is_file():
+            self._database = SQLDatabase(os.environ[DB_PATH])
+        else:
+            raise FileNotFoundError(f"Did not find a database at {os.environ[DB_PATH]}")
 
         try:
             storage = Storage(os.environ[STORAGE_PATH])
@@ -59,18 +65,7 @@ class Logger:
         )
         row[key] = value
 
-        self._database.write(self._experiment_name, row, key, value)
-
-        """
-        SSDB.insert_log(
-            self._path_to_db,
-            self._experiment_name,
-            self._trial.trial_id,
-            iteration,
-            key,
-            value,
-        )
-        """
+        self._database.write(self._experiment_name, row)
 
         if self._asha is not None:
             db = self._database.read(self._experiment_name)

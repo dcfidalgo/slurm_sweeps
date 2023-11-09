@@ -74,6 +74,8 @@ class SlurmSweepsCallback(pl.Callback):
 
 
 class ParallelSlurmEnvironment(SLURMEnvironment):
+    """Only needed for lightning versions < 2.0.3"""
+
     @property
     def main_address(self) -> str:
         if "MASTER_ADDR" in os.environ:
