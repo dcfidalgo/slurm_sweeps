@@ -36,7 +36,7 @@ jobs:
         run: echo "today=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
         shell: bash
       - name: Cache Conda env
-        uses: action/cache@v3
+        uses: actions/cache@v3
         env:
           CACHE_NUMBER: 0
         with:
@@ -45,7 +45,7 @@ jobs:
             conda-${{
             runner.os }}-${{
             steps.get-date.outputs.today }}-${{
-            hashFile('environment.yml') }}-${{
+            hashFiles('environment.yml') }}-${{
             env.CACHE_NUMBER }}
         id: cache
       - name: Update environment
