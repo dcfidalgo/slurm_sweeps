@@ -6,15 +6,15 @@ channels:
 dependencies:
   - python>3.9.0
   - pytorch
-  - pytorch-cuda=11.8
-#  - cpuonly
+#  - pytorch-cuda=11.8
+  - cpuonly
   - torchvision
-  - ipython
   - pip
   - pip:
       - -e .
       # for tests
-      - pytest=7.3.1
+      - pytest
+      - pytest-cov
       - fasteners
       - lightning
       - wandb
