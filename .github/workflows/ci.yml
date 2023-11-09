@@ -10,6 +10,9 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     # For the slurm action to work, you have to supply a mysql service as defined below.
     services:
       mysql:
@@ -49,12 +52,10 @@ jobs:
             env.CACHE_NUMBER }}
         id: cache
       - name: Update environment
-        run:
-          mamba env update -n slurm_sweeps -f environment.yml
+        run: mamba env update -n slurm_sweeps -f environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
       - name: Running tests
-        run: |
-          pytest --cov=slurm_sweeps
+        run: pytest --cov=slurm_sweeps
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
         env:
