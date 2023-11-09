@@ -53,7 +53,7 @@ jobs:
           mamba env update -n slurm_sweeps -f environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
       - name: Running tests
-        run:
+        run: |
           pytest --cov=slurm_sweeps
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
