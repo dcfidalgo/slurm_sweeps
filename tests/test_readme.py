@@ -74,8 +74,7 @@ dataframe = experiment.run(n_trials=10)
     slurm_script = f"""#!/bin/bash -l
 #SBATCH -J train
 #SBATCH --nodes=1
-#SBATCH --tasks-per-node=2
-#SBATCH --cpus-per-task=1
+#SBATCH --ntasks-per-node=2
 
 python train.py
 """

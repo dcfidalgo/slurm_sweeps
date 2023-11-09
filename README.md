@@ -79,7 +79,7 @@ Write a small SLURM script `test_ss.slurm` that runs the code above:
 ```bash
 #!/bin/bash -l
 #SBATCH --nodes=2
-#SBATCH --tasks-per-node=18
+#SBATCH --ntasks-per-node=18
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=1GB
 
