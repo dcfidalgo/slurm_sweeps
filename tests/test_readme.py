@@ -96,6 +96,6 @@ python train.py
     job_out = subprocess.check_output(["cat", "slurm-3.out"], cwd=tmp_path)
     dataframe = SqlDatabase(local_dir / "slurm_sweeps.db").read("MySweep")
 
-    assert "max number of concurrent trials: 2" in job_out.decode()
+    assert "max number of concurrent trials: 2" in job_out.decode()[50:]
     assert len(dataframe) > 10
     assert dataframe[ITERATION].sort_values().iloc[-1] == 9
