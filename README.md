@@ -4,7 +4,7 @@
   slurm sweeps
 </h1>
 <p align="center"><b>A simple tool to perform parameter sweeps on SLURM clusters.</b></p>
-<p align="center"> 
+<p align="center">
   <a href="https://github.com/dcfidalgo/slurm_sweeps/blob/main/LICENSE">
     <img alt="License" src="https://img.shields.io/github/license/dcfidalgo/slurm_sweeps.svg?color=blue">
   </a>
@@ -32,7 +32,6 @@ pip install .
 
 ### Dependencies
 - cloudpickle
-- fasteners
 - numpy
 - pandas
 - pyyaml
@@ -53,7 +52,8 @@ def train(cfg: dict):
     for epoch in range(cfg["epochs"]):
         sleep(0.5)
         loss = (cfg["parameter"] - 1) ** 2 * epoch
-        logger.log("loss", loss, epoch)
+        # log your metric
+        logger.log({"loss": loss}, epoch)
 
 
 # Define your experiment
@@ -105,12 +105,12 @@ def __init__(
     train: Callable,
     cfg: Dict,
     name: str = "MySweep",
-    local_dir: str = "./slurm_sweeps",
+    local_dir: Union[str, Path] = "./slurm_sweeps.db",
     backend: Optional[Backend] = None,
     asha: Optional[ASHA] = None,
     database: Optional[Database] = None,
     restore: bool = False,
-    exist_ok: bool = False,
+    overwrite: bool = False,
 )
 ```
 
