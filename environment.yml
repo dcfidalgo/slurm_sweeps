@@ -19,4 +19,4 @@ dependencies:
       - lightning
       - wandb
       # for development
-      - pre_commit=3.3.1
+      - pre_commit
