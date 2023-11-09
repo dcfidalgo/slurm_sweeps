@@ -42,6 +42,11 @@ class ASHA:
             self._min_t * (self._rf**i) for i in reversed(range(rung_max + 1))
         ]
 
+    @property
+    def metric(self):
+        """The metric to optimize."""
+        return self._metric
+
     def find_trials_to_prune(self, database: "pd.DataFrame") -> List[str]:
         """Check the database and find trials to prune.
 
