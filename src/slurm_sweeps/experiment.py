@@ -22,7 +22,7 @@ from .constants import (
     TRIAL_ID,
     WAITING_TIME_IN_SEC,
 )
-from .database import Database
+from .database import Database, ExperimentExistsError, SqlDatabase
 from .sampler import Sampler
 from .storage import Storage
 from .trial import Status, Trial
@@ -31,10 +31,10 @@ _logger = logging.getLogger(__name__)
 
 
 class Experiment:
-    """Run an HPO experiment using random search and the Asynchronous Successive Halving Algorithm (ASHA).
+    """Set up an HPO experiment.
 
     Args:
-        train: A train function that takes as input a `cfg` dict.
+        train: A train function that takes as input the `cfg` dict.
         cfg: A dict passed on to the `train` function.
             It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
         name: The name of the experiment.
@@ -44,9 +44,9 @@ class Experiment:
             otherwise we choose the standard `Backend` that simply executes the trial in another process.
         asha: An optional ASHA instance to cancel less promising trials. By default, it is None.
         database: A database instance to store the trial's (intermediate) results.
-            By default, it will create the database at `{local_dir}/.database'.
+            By default, we will create the database at `{local_dir}/slurm_sweeps.db`.
         restore: Restore an experiment with the same name?
-        exist_ok: Replace an existing experiment with the same name?
+        overwrite: Overwrite an existing experiment with the same name?
     """
 
     def __init__(
@@ -59,23 +59,23 @@ class Experiment:
         asha: Optional[ASHA] = None,
         database: Optional[Database] = None,
         restore: bool = False,
-        exist_ok: bool = False,
+        overwrite: bool = False,
     ):
         self._cfg = cfg
         self._name = name
         self._local_dir = Path(local_dir)
 
         storage_path = self._create_experiment_dir(
-            self._local_dir / name, restore, exist_ok
+            self._local_dir / name, restore, overwrite
         )
         self._storage = Storage(storage_path)
         self._storage.dump(train, TRAIN_PKL)
         if asha:
             self._storage.dump(asha, ASHA_PKL)
 
-        self._database = database or Database(self._local_dir / "slurm_sweeps.db")
+        self._database = database or SqlDatabase(self._local_dir / "slurm_sweeps.db")
         if not restore:
-            self._database.create(experiment=self._name, exist_ok=exist_ok)
+            self._database.create(experiment=self._name, overwrite=overwrite)
 
         self._backend = backend or (
             SlurmBackend() if SlurmBackend.is_running() else Backend()
@@ -92,7 +92,10 @@ class Experiment:
     def _create_experiment_dir(
         experiment_path: Path, restore: bool, exist_ok: bool
     ) -> Path:
-        experiment_path.mkdir(parents=True, exist_ok=exist_ok)
+        try:
+            experiment_path.mkdir(parents=True, exist_ok=exist_ok)
+        except FileExistsError as err:
+            raise ExperimentExistsError(experiment_path.name) from err
         if not restore:
             for content in experiment_path.iterdir():
                 if content.is_dir():
