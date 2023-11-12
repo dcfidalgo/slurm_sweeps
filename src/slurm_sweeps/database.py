@@ -1,6 +1,3 @@
-import abc
-import datetime
-import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,92 +7,25 @@ import pandas as pd
 
 from .constants import CFG, ITERATION, TIMESTAMP, TRIAL_ID
 
-try:
-    import fasteners
-except ModuleNotFoundError:
-    _has_fasteners = False
-else:
-    _has_fasteners = True
 
+class SqlDatabase:
+    """An SQLite database that stores the trials and their metrics.
 
-class Database(abc.ABC):
+    Args:
+        path: The path to the database file.
+    """
+
     def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
         self._path = Path(path).resolve()
 
-    @property
-    def path(self):
-        return self._path
-
-    @abc.abstractmethod
-    def create(self, experiment: str, overwrite: bool = False):
-        pass
-
-    @abc.abstractmethod
-    def write(self, experiment: str, row: Dict):
-        pass
-
-    @abc.abstractmethod
-    def read(self, experiment: str) -> pd.DataFrame:
-        pass
-
-
-class FileDatabase(Database):
-    def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
-        if not _has_fasteners:
-            raise ModuleNotFoundError(
-                "You need to install 'fasteners' to use the FileDatabase: "
-                "`pip install fasteners`"
-            )
-
-        super().__init__(path=path)
-        self.path.mkdir(parents=True, exist_ok=True)
-
-    def _get_file_path_and_lock(
-        self, experiment
-    ) -> Tuple[Path, fasteners.InterProcessReaderWriterLock]:
-        path = self.path / f"{experiment}.txt"
-        lock = fasteners.InterProcessReaderWriterLock(f"{path}.lock")
-
-        return path, lock
-
-    def create(self, experiment: str, overwrite: bool = False):
-        path, _ = self._get_file_path_and_lock(experiment)
-        try:
-            path.touch(exist_ok=overwrite)
-        except FileExistsError as err:
-            raise ExperimentExistsError(experiment) from err
-        with path.open(mode="w"):
-            pass
-
-    def write(self, experiment: str, row: Dict):
-        path, lock = self._get_file_path_and_lock(experiment)
-        # quick check if file exists
-        with path.open():
-            pass
-
-        row[TIMESTAMP] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        json_str = json.dumps(row)
-
-        lock.acquire_write_lock()
-        with path.open(mode="a") as f:
-            f.write(json_str + "\n")
-        lock.release_write_lock()
-
-    def read(self, experiment: str) -> pd.DataFrame:
-        path, lock = self._get_file_path_and_lock(experiment)
-        lock.acquire_read_lock()
-        database_df = pd.read_json(path, lines=True)
-        lock.release_read_lock()
-
-        return database_df
-
-
-class SqlDatabase(Database):
-    def __init__(self, path: Union[str, Path] = "./slurm_sweeps.db"):
-        super().__init__(path)
         if not self.path.exists():
             with self._connection() as con:
                 con.execute("vacuum")
+
+    @property
+    def path(self):
+        """The path to the database file."""
+        return self._path
 
     @contextmanager
     def _connection(self):
