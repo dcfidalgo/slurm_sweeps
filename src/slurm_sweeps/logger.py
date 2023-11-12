@@ -14,7 +14,7 @@ from .constants import (
     STORAGE_PATH,
     TRIAL_ID,
 )
-from .database import FileDatabase, SqlDatabase
+from .database import SqlDatabase
 from .storage import Storage
 from .trial import Trial
 
@@ -30,12 +30,9 @@ class Logger:
         self._trial = Trial(cfg=cfg)
 
         self._experiment_name = os.environ[EXPERIMENT_NAME]
-        if Path(os.environ[DB_PATH]).is_dir():
-            self._database = FileDatabase(os.environ[DB_PATH])
-        elif Path(os.environ[DB_PATH]).is_file():
-            self._database = SqlDatabase(os.environ[DB_PATH])
-        else:
+        if not Path(os.environ[DB_PATH]).is_file():
             raise FileNotFoundError(f"Did not find a database at {os.environ[DB_PATH]}")
+        self._database = SqlDatabase(os.environ[DB_PATH])
 
         self._asha: Optional[ASHA] = None
         try:
