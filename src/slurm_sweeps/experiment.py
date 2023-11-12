@@ -22,7 +22,7 @@ from .constants import (
     TRIAL_ID,
     WAITING_TIME_IN_SEC,
 )
-from .database import Database, ExperimentExistsError, SqlDatabase
+from .database import ExperimentExistsError, SqlDatabase
 from .sampler import Sampler
 from .storage import Storage
 from .trial import Status, Trial
@@ -39,12 +39,10 @@ class Experiment:
             It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
         name: The name of the experiment.
         local_dir: Where to store and run the experiments. In this directory
-            we will create a folder with the experiment name.
+            we will create the database `slurm_sweeps.db` and a folder with the experiment name.
         backend: A backend to execute the trials. By default, we choose the `SlurmBackend` if Slurm is available,
             otherwise we choose the standard `Backend` that simply executes the trial in another process.
-        asha: An optional ASHA instance to cancel less promising trials. By default, it is None.
-        database: A database instance to store the trial's (intermediate) results.
-            By default, we will create the database at `{local_dir}/slurm_sweeps.db`.
+        asha: An optional ASHA instance to cancel less promising trials.
         restore: Restore an experiment with the same name?
         overwrite: Overwrite an existing experiment with the same name?
     """
@@ -57,7 +55,6 @@ class Experiment:
         local_dir: Union[str, Path] = "./slurm_sweeps",
         backend: Optional[Backend] = None,
         asha: Optional[ASHA] = None,
-        database: Optional[Database] = None,
         restore: bool = False,
         overwrite: bool = False,
     ):
@@ -73,7 +70,7 @@ class Experiment:
         if asha:
             self._storage.dump(asha, ASHA_PKL)
 
-        self._database = database or SqlDatabase(self._local_dir / "slurm_sweeps.db")
+        self._database = SqlDatabase(self._local_dir / "slurm_sweeps.db")
         if not restore:
             self._database.create(experiment=self._name, overwrite=overwrite)
 
