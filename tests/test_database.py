@@ -1,64 +1,100 @@
+import sqlite3
 from functools import partial
 from multiprocessing import Pool
-from typing import Dict, Union
+from typing import Dict
 
 import numpy as np
+import pandas as pd
 import pytest
 
-from slurm_sweeps.constants import TIMESTAMP
-from slurm_sweeps.database import ExperimentExistsError, FileDatabase, SqlDatabase
+from slurm_sweeps.constants import CFG, ITERATION, TIMESTAMP, TRIAL_ID
+from slurm_sweeps.database import ExperimentExistsError, SqlDatabase
 
 
-@pytest.fixture(params=["file", "sql"])
-def database(request, tmp_path) -> Union[FileDatabase, SqlDatabase]:
+@pytest.fixture
+def database(tmp_path) -> SqlDatabase:
     db_path = tmp_path / "slurm_sweeps.db"
-    if request.param == "file":
-        return FileDatabase(db_path)
-    if request.param == "sql":
-        return SqlDatabase(db_path)
-    raise NotImplementedError(
-        f"'database' fixture not implemented for '{request.param}'"
-    )
+    return SqlDatabase(db_path)
 
 
-@pytest.mark.parametrize(
-    "database, is_file_or_dir",
-    [("file", "is_dir"), ("sql", "is_file")],
-    indirect=["database"],
-)
-def test_init(database, is_file_or_dir):
-    assert getattr(database.path, is_file_or_dir)()
-
-
-def test_fasteners_not_installed(monkeypatch):
-    monkeypatch.setattr("slurm_sweeps.database._has_fasteners", False)
-    with pytest.raises(ModuleNotFoundError):
-        FileDatabase()
+def test_init(database):
+    assert database.path.is_file()
 
 
 def test_create(database):
     experiment = "test_experiment"
     database.create(experiment)
-    database.write(experiment, {"test": "test"})
-    assert len(database.read(experiment)) == 1
+
+    con = sqlite3.connect(database.path)
+    check_exists = con.execute(
+        "select name from sqlite_master where type='table' and name='test_experiment';"
+    ).fetchone()
+    check_columns = con.execute(f"pragma table_info({experiment})").fetchall()
+    con.close()
+    assert check_exists == ("test_experiment",)
+    assert [(col[1], col[2], col[4]) for col in check_columns] == [
+        (TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
+        (TRIAL_ID, "TEXT", None),
+        (ITERATION, "INTEGER", None),
+        (CFG, "TEXT", None),
+    ]
 
     with pytest.raises(ExperimentExistsError):
         database.create(experiment)
 
+    database.write("test_experiment", {"test": 0})
     database.create(experiment, overwrite=True)
-    assert len(database.read(experiment)) == 0
+    # check if empty again
+    con = sqlite3.connect(database.path)
+    response = con.execute("select exists (select 1 from test_experiment);").fetchone()
+    con.close()
+    assert response == (0,)
 
 
-def read_or_write(
-    mode: str, database: Union[FileDatabase, SqlDatabase], experiment: str, row: Dict
-):
+def test_write_and_read(database):
+    database.create("test_experiment")
+    database.write("test_experiment", {"test_int": 1, "test_float": 0.5})
+
+    con = sqlite3.connect(database.path)
+    response = con.execute("select count(*) from test_experiment").fetchone()
+    con.close()
+    assert response == (1,)
+
+    df = database.read("test_experiment")
+    assert isinstance(df, pd.DataFrame)
+    assert list(df.columns) == [
+        TIMESTAMP,
+        TRIAL_ID,
+        ITERATION,
+        CFG,
+        "test_int",
+        "test_float",
+    ]
+    assert type(df[TIMESTAMP].iloc[0]) is str
+    assert (
+        df.iloc[:, 1:]
+        .compare(
+            pd.DataFrame(
+                {
+                    TRIAL_ID: [np.nan],
+                    ITERATION: [np.nan],
+                    CFG: [np.nan],
+                    "test_int": [1],
+                    "test_float": [0.5],
+                }
+            )
+        )
+        .empty
+    )
+
+
+def read_or_write(mode: str, database: SqlDatabase, experiment: str, row: Dict):
     if mode == "w":
         database.write(experiment, row)
     else:
         database.read(experiment)
 
 
-@pytest.mark.parametrize("database", ["file", "sql"], indirect=["database"])
 def test_concurrent_write_read(database):
     experiment = "test_db_write_read"
     n = 250
@@ -91,7 +127,7 @@ def test_nan_values(database):
     assert np.isnan(df["loss"].iloc[0])
 
 
-@pytest.mark.skip("Only for speed comparisons")
+# @pytest.mark.skip("Only for speed comparisons")
 def test_speed(monkeypatch, database):
     from slurm_sweeps import Logger
     from slurm_sweeps.constants import DB_PATH, EXPERIMENT_NAME
