@@ -4,8 +4,8 @@ from time import sleep
 import pytest
 
 import slurm_sweeps as ss
-from slurm_sweeps import SqlDatabase
 from slurm_sweeps.constants import ITERATION
+from slurm_sweeps.database import SqlDatabase
 
 
 def is_slurm_available() -> bool:
