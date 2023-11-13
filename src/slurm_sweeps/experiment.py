@@ -14,9 +14,10 @@ from .asha import ASHA
 from .backend import Backend, SlurmBackend
 from .constants import (
     ASHA_PKL,
+    DB_ITERATION,
     DB_PATH,
+    DB_TRIAL_ID,
     EXPERIMENT_NAME,
-    ITERATION,
     STORAGE_PATH,
     TRAIN_PKL,
     TRIAL_ID,
@@ -249,18 +250,20 @@ class Experiment:
         if not database.empty:
             if summarize_cfg_and_metrics is True:
                 summarize_cfg_and_metrics = [
-                    col for col in database.columns if col not in [ITERATION, TRIAL_ID]
+                    col
+                    for col in database.columns
+                    if col not in [DB_ITERATION, DB_TRIAL_ID]
                 ]
             elif summarize_cfg_and_metrics is False:
                 summarize_cfg_and_metrics = []
 
             for trial_dict in summary_dicts:
-                id_mask = database[TRIAL_ID] == trial_dict["TRIAL_ID"]
-                trial_df = database[id_mask].sort_values(ITERATION)
+                id_mask = database[DB_TRIAL_ID] == trial_dict["TRIAL_ID"]
+                trial_df = database[id_mask].sort_values(DB_ITERATION)
                 if trial_df.empty:
                     continue
 
-                trial_dict["ITERATION"] = trial_df.iloc[-1][ITERATION]
+                trial_dict["ITERATION"] = trial_df.iloc[-1][DB_ITERATION]
                 for key in summarize_cfg_and_metrics:
                     trial_dict[key] = trial_df.iloc[-1][key]
 

@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from slurm_sweeps import ASHA
-from slurm_sweeps.constants import ITERATION, TRIAL_ID
+from slurm_sweeps.constants import DB_ITERATION, DB_TRIAL_ID
 
 
 @pytest.fixture(
@@ -10,19 +10,19 @@ from slurm_sweeps.constants import ITERATION, TRIAL_ID
 )  # make sure it works with ITERATION starting with 0 and 1
 def database(request):
     data = [
-        {ITERATION: 0 + request.param, TRIAL_ID: "a", "loss": 10.0},
-        {ITERATION: 0 + request.param, TRIAL_ID: "b", "loss": 9.0},
-        {ITERATION: 0 + request.param, TRIAL_ID: "c", "loss": 8.0},
-        {ITERATION: 0 + request.param, TRIAL_ID: "d", "loss": 7.0},
-        {ITERATION: 1 + request.param, TRIAL_ID: "aa", "loss": 10.0},
-        {ITERATION: 1 + request.param, TRIAL_ID: "bb", "loss": 9.0},
-        {ITERATION: 1 + request.param, TRIAL_ID: "cc", "loss": 8.0},
-        {ITERATION: 1 + request.param, TRIAL_ID: "dd", "loss": 7.0},
-        {ITERATION: 1 + request.param, TRIAL_ID: "nan", "loss": float("nan")},
-        {ITERATION: 3 + request.param, TRIAL_ID: "aaa", "loss": 10.0},
-        {ITERATION: 3 + request.param, TRIAL_ID: "bbb", "loss": 9.0},
-        {ITERATION: 3 + request.param, TRIAL_ID: "ccc", "loss": 8.0},
-        {ITERATION: 3 + request.param, TRIAL_ID: "ddd", "loss": 7.0},
+        {DB_ITERATION: 0 + request.param, DB_TRIAL_ID: "a", "loss": 10.0},
+        {DB_ITERATION: 0 + request.param, DB_TRIAL_ID: "b", "loss": 9.0},
+        {DB_ITERATION: 0 + request.param, DB_TRIAL_ID: "c", "loss": 8.0},
+        {DB_ITERATION: 0 + request.param, DB_TRIAL_ID: "d", "loss": 7.0},
+        {DB_ITERATION: 1 + request.param, DB_TRIAL_ID: "aa", "loss": 10.0},
+        {DB_ITERATION: 1 + request.param, DB_TRIAL_ID: "bb", "loss": 9.0},
+        {DB_ITERATION: 1 + request.param, DB_TRIAL_ID: "cc", "loss": 8.0},
+        {DB_ITERATION: 1 + request.param, DB_TRIAL_ID: "dd", "loss": 7.0},
+        {DB_ITERATION: 1 + request.param, DB_TRIAL_ID: "nan", "loss": float("nan")},
+        {DB_ITERATION: 3 + request.param, DB_TRIAL_ID: "aaa", "loss": 10.0},
+        {DB_ITERATION: 3 + request.param, DB_TRIAL_ID: "bbb", "loss": 9.0},
+        {DB_ITERATION: 3 + request.param, DB_TRIAL_ID: "ccc", "loss": 8.0},
+        {DB_ITERATION: 3 + request.param, DB_TRIAL_ID: "ddd", "loss": 7.0},
     ]
     return pd.DataFrame(data)
 

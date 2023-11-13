@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from slurm_sweeps.constants import CFG, ITERATION, TIMESTAMP, TRIAL_ID
+from slurm_sweeps.constants import DB_CFG, DB_ITERATION, DB_TIMESTAMP, DB_TRIAL_ID
 from slurm_sweeps.database import ExperimentExistsError, SqlDatabase
 
 
@@ -33,10 +33,10 @@ def test_create(database):
     con.close()
     assert check_exists == ("test_experiment",)
     assert [(col[1], col[2], col[4]) for col in check_columns] == [
-        (TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
-        (TRIAL_ID, "TEXT", None),
-        (ITERATION, "INTEGER", None),
-        (CFG, "TEXT", None),
+        (DB_TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
+        (DB_TRIAL_ID, "TEXT", None),
+        (DB_ITERATION, "INTEGER", None),
+        (DB_CFG, "TEXT", None),
     ]
 
     with pytest.raises(ExperimentExistsError):
@@ -63,22 +63,22 @@ def test_write_and_read(database):
     df = database.read("test_experiment")
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
-        TIMESTAMP,
-        TRIAL_ID,
-        ITERATION,
-        CFG,
+        DB_TIMESTAMP,
+        DB_TRIAL_ID,
+        DB_ITERATION,
+        DB_CFG,
         "test_int",
         "test_float",
     ]
-    assert type(df[TIMESTAMP].iloc[0]) is str
+    assert type(df[DB_TIMESTAMP].iloc[0]) is str
     assert (
         df.iloc[:, 1:]
         .compare(
             pd.DataFrame(
                 {
-                    TRIAL_ID: [np.nan],
-                    ITERATION: [np.nan],
-                    CFG: [np.nan],
+                    DB_TRIAL_ID: [np.nan],
+                    DB_ITERATION: [np.nan],
+                    DB_CFG: [np.nan],
                     "test_int": [1],
                     "test_float": [0.5],
                 }
@@ -114,7 +114,7 @@ def test_concurrent_write_read(database):
     df = database.read(experiment)
 
     assert len(df) == sum(args == "w")
-    assert all([col in df.columns for col in [TIMESTAMP, "loss", "lr"]])
+    assert all([col in df.columns for col in [DB_TIMESTAMP, "loss", "lr"]])
 
 
 def test_nan_values(database):

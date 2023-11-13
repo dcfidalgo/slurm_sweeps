@@ -68,7 +68,6 @@ def train(cfg):
         accelerator="gpu",
         max_epochs=cfg["max_epochs"],
         callbacks=SlurmSweepsCallback(
-            cfg,
             "val_loss",
             log_to_wandb=True,
             wandb_init_kwargs=dict(
