@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 import numpy as np
 
-from .constants import ITERATION, TRIAL_ID
+from .constants import DB_ITERATION, DB_TRIAL_ID
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -57,12 +57,12 @@ class ASHA:
             List of trial ids that should be pruned.
         """
         # make sure iteration starts with 1
-        if database[ITERATION].min() == 0:
-            database[ITERATION] += 1
+        if database[DB_ITERATION].min() == 0:
+            database[DB_ITERATION] += 1
 
         trials = []
         for rung in self._rungs:
-            df = database[database[ITERATION] == rung]
+            df = database[database[DB_ITERATION] == rung]
             if df.empty:
                 continue
 
@@ -75,6 +75,6 @@ class ASHA:
                 cutoff = np.nanpercentile(df[self._metric], (1 - 1 / self._rf) * 100)
                 ids = df[self._metric] < cutoff
 
-            trials += list(df[nans | ids][TRIAL_ID])
+            trials += list(df[nans | ids][DB_TRIAL_ID])
 
         return trials

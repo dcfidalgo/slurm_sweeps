@@ -1,32 +1,29 @@
 import os
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
 import pytorch_lightning as pl
 from pytorch_lightning.plugins.environments import SLURMEnvironment
 
-from slurm_sweeps import Logger
+import slurm_sweeps as ss
 
 
 class SlurmSweepsCallback(pl.Callback):
     """A Pytorch Lightning callback that logs the metric to slurm sweeps.
 
     Args:
-        cfg: The cfg dict of the train function.
-        metric: The metric you want to optimize.
+        metrics: The metrics you want to log after each epoch (`on_validation_end`).
         log_to_wandb: Log to WandB? By default, we automatically log to Wandb if it is installed.
         wandb_init_kwargs: Passed on to the wandb.init() method
     """
 
     def __init__(
         self,
-        cfg: Dict,
-        metric: str,
+        metrics: Union[str, List[str]],
         log_to_wandb: Optional[bool] = None,
         wandb_init_kwargs: Optional[Dict] = None,
     ):
         super().__init__()
-        self._logger = Logger(cfg)
-        self._metric = metric
+        self._metrics = [metrics] if isinstance(metrics, str) else metrics
         self._wandb_init_kwargs = wandb_init_kwargs or {}
 
         if log_to_wandb is False:
@@ -38,10 +35,6 @@ class SlurmSweepsCallback(pl.Callback):
                 self._wandb = None
             else:
                 self._wandb = wandb
-
-    @property
-    def logger(self):
-        return self._logger
 
     @pl.utilities.rank_zero.rank_zero_only
     def setup(
@@ -67,10 +60,15 @@ class SlurmSweepsCallback(pl.Callback):
             if self._wandb is not None:
                 self._wandb.log(trainer.callback_metrics, step=iteration)
 
-            metric = float(trainer.callback_metrics[self._metric].detach().cpu())
+            metric_values = [
+                float(trainer.callback_metrics[metric].detach().cpu())
+                for metric in self._metrics
+            ]
             # Keep in mind, the log call can raise an Exception if ASHA says so,
             # so it should come after the wandb.log call!
-            self.logger.log(self._metric, metric, iteration)
+            ss.log(
+                {key: val for key, val in zip(self._metrics, metric_values)}, iteration
+            )
 
 
 class ParallelSlurmEnvironment(SLURMEnvironment):

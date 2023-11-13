@@ -48,12 +48,11 @@ import slurm_sweeps as ss
 
 # Define your train function
 def train(cfg: dict):
-    logger = ss.Logger(cfg)
     for epoch in range(cfg["epochs"]):
         sleep(0.5)
         loss = (cfg["parameter"] - 1) ** 2 * epoch
-        # log your metric
-        logger.log({"loss": loss}, epoch)
+        # log your metrics
+        ss.log({"loss": loss}, epoch)
 
 
 # Define your experiment

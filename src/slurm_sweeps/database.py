@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 
-from .constants import CFG, ITERATION, TIMESTAMP, TRIAL_ID
+from .constants import DB_CFG, DB_ITERATION, DB_TIMESTAMP, DB_TRIAL_ID
 
 
 class SqlDatabase:
@@ -42,10 +42,10 @@ class SqlDatabase:
             try:
                 con.execute(
                     f"create table {experiment}("
-                    f"{TIMESTAMP} datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),"
-                    f"{TRIAL_ID} text,"
-                    f"{ITERATION} integer,"
-                    f"{CFG} text);"
+                    f"{DB_TIMESTAMP} datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),"
+                    f"{DB_TRIAL_ID} text,"
+                    f"{DB_ITERATION} integer,"
+                    f"{DB_CFG} text);"
                 )
             except sqlite3.OperationalError as err:
                 if "already exists" in str(err):

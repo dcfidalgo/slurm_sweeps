@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from textwrap import dedent
 
-from .constants import CFG_YML, TRAIN_PKL, TRAIN_PY
+from .constants import CFG_YML, TRAIN_PKL, TRAIN_PY, TRIAL_ID
 from .storage import Storage
 from .trial import Trial
 
@@ -31,6 +31,7 @@ class Backend:
         args = self._build_args(train_path, cfg_path)
         out_path = cfg_path.parent / "stdout.log"
         err_path = cfg_path.parent / "stderr.log"
+        os.environ[TRIAL_ID] = trial.trial_id  # logger needs it!
         with out_path.open("w") as out_file, err_path.open("w") as err_file:
             trial_process = subprocess.Popen(
                 args,
