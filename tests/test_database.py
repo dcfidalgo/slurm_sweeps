@@ -127,10 +127,10 @@ def test_nan_values(database):
     assert np.isnan(df["loss"].iloc[0])
 
 
-# @pytest.mark.skip("Only for speed comparisons")
+@pytest.mark.skip("Only for speed comparisons")
 def test_speed(monkeypatch, database):
-    from slurm_sweeps import Logger
     from slurm_sweeps.constants import DB_PATH, EXPERIMENT_NAME
+    from slurm_sweeps.logger import Logger
 
     experiment = "test_speed"
     n = 500
@@ -139,7 +139,7 @@ def test_speed(monkeypatch, database):
     monkeypatch.setenv(EXPERIMENT_NAME, experiment)
 
     database.create(experiment)
-    logger = Logger({})
+    logger = Logger()
     for i in range(n):
         if i % 1 == 0:
             logger.log({"loss": 1}, iteration=i)
