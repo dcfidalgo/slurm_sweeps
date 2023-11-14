@@ -53,7 +53,7 @@ class Experiment:
         train: Callable,
         cfg: Dict,
         name: str = "MySweep",
-        local_dir: Union[str, Path] = "./slurm_sweeps",
+        local_dir: Union[str, Path] = "./slurm-sweeps",
         backend: Optional[Backend] = None,
         asha: Optional[ASHA] = None,
         restore: bool = False,
