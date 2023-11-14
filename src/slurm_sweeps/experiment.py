@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -14,8 +15,11 @@ from .asha import ASHA
 from .backend import Backend, SlurmBackend
 from .constants import (
     ASHA_PKL,
+    DB_CFG,
     DB_ITERATION,
+    DB_LOGGED,
     DB_PATH,
+    DB_TIMESTAMP,
     DB_TRIAL_ID,
     EXPERIMENT_NAME,
     STORAGE_PATH,
@@ -253,12 +257,17 @@ class Experiment:
         # add database info
         database = self._database.read(experiment=self._name)
         if not database.empty:
+            metrics = [
+                col
+                for col in database.columns
+                if not (col.startswith("_") or col.endswith(DB_LOGGED))
+            ]
+
             if summarize_cfg_and_metrics is True:
-                summarize_cfg_and_metrics = [
-                    col
-                    for col in database.columns
-                    if col not in [DB_ITERATION, DB_TRIAL_ID]
-                ]
+                summarize_cfg_and_metrics = list(
+                    json.loads(database[DB_CFG].iloc[0]).keys()
+                )
+                summarize_cfg_and_metrics += metrics
             elif summarize_cfg_and_metrics is False:
                 summarize_cfg_and_metrics = []
 
@@ -269,8 +278,17 @@ class Experiment:
                     continue
 
                 trial_dict["ITERATION"] = trial_df.iloc[-1][DB_ITERATION]
-                for key in summarize_cfg_and_metrics:
-                    trial_dict[key] = trial_df.iloc[-1][key]
+                # adding cfg
+                for key, val in json.loads(trial_df.iloc[-1][DB_CFG]).items():
+                    if key in summarize_cfg_and_metrics:
+                        trial_dict[key] = val
+
+                # adding metrics
+                for metric in metrics:
+                    if metric not in summarize_cfg_and_metrics:
+                        continue
+                    metric_df = trial_df[trial_df[f"{metric}{DB_LOGGED}"] == 1]
+                    trial_dict[metric] = metric_df.iloc[-1][metric]
 
         summary_df = pd.DataFrame(summary_dicts).set_index("TRIAL_ID")
 
