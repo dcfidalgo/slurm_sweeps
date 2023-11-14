@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "slurm_sweeps"
 description= "A simple tool to perform sweeps on SLURM clusters."
 readme = "README.md"
-version = "0.1a1"
+version = "0.2.0.dev0"
 requires-python = ">=3.9"
 dependencies = [
     "cloudpickle",
