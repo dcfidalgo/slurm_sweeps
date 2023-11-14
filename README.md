@@ -24,10 +24,9 @@ However, on a SLURM cluster, these tools can be complicated to set up and introd
 It uses SLURM Job Steps to run the individual trials.
 
 ## Installation
-Clone the repo and install it via pip:
 
 ```commandline
-pip install .
+pip install slurm-sweeps
 ```
 
 ### Dependencies
