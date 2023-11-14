@@ -13,7 +13,7 @@
   </a>
 </p>
 
-The main idea is to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) for
+The main motivation was to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) for
 [SLURM clusters](https://slurm.schedmd.com/overview.html) that is fully compatible with
 [pytorch-lightning's ddp](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel).
 
