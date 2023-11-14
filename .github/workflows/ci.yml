@@ -65,11 +65,11 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    # if: ${{ github.event_name == 'release' }}
+    if: ${{ github.event_name == 'release' }}
     needs: [tests]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Set up Pythonh
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
@@ -87,3 +87,7 @@ jobs:
       - name: Test installing
         run: |
           pip install --index-url https://test.pypi.org/simple --no-deps slurm-sweeps
+      - name: Publish to PyPi
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
