@@ -85,6 +85,11 @@ class Experiment:
         os.environ[EXPERIMENT_NAME] = name
         os.environ[STORAGE_PATH] = str(self._storage.path)
         os.environ[DB_PATH] = str(self._database.path)
+        # in case we import modules that are not installed
+        try:
+            os.environ["PYTHONPATH"] = f"{os.environ['PYTHONPATH']}:{os.getcwd()}"
+        except KeyError:
+            os.environ["PYTHONPATH"] = os.getcwd()
 
     @staticmethod
     def _create_experiment_dir(
