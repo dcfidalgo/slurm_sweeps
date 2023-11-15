@@ -74,16 +74,12 @@ class SlurmBackend(Backend):
     Pass an instance of this class to your experiment.
 
     Args:
-        exclusive: Add the `--exclusive` switch.
         nodes: How many nodes do you request for your srun?
         ntasks: How many tasks do you request for your srun?
         args: Additional command line arguments for srun, formatted as a string.
     """
 
-    def __init__(
-        self, exclusive: bool = True, nodes: int = 1, ntasks: int = 1, args: str = ""
-    ):
-        self._exclusive = exclusive
+    def __init__(self, nodes: int = 1, ntasks: int = 1, args: str = ""):
         self._nodes = nodes
         self._ntasks = ntasks
         self._args = args
@@ -95,10 +91,7 @@ class SlurmBackend(Backend):
 
     def _build_args(self, train_path: Path, cfg_path: Path) -> str:
         """Build arguments for the subprocess."""
-        slurm_cmd = (
-            f"srun {'--exclusive' if self._exclusive else ''} "
-            f"--nodes={self._nodes} --ntasks={self._ntasks} {self._args} "
-        )
+        slurm_cmd = f"srun --nodes={self._nodes} --ntasks={self._ntasks} {self._args} "
         return slurm_cmd + super()._build_args(train_path, cfg_path)
 
     @staticmethod
