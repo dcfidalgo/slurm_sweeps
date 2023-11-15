@@ -99,7 +99,7 @@ class SlurmBackend(Backend):
         """Are we running inside an `sbatch` call?"""
         try:
             subprocess.check_output(["sinfo"])
-            assert hasattr(os.environ, "SLURM_NTASKS")
+            assert "SLURM_NTASKS" in os.environ
         except (FileNotFoundError, subprocess.CalledProcessError, AssertionError):
             return False
         else:
