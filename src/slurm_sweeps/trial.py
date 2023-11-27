@@ -1,8 +1,8 @@
 import hashlib
 import json
 import subprocess
-import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, Optional
 
@@ -27,8 +27,8 @@ class Status(Enum):
 class Trial:
     cfg: Dict
     process: Optional[subprocess.Popen] = None
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
 
     @property
     def trial_id(self) -> str:
@@ -52,10 +52,10 @@ class Trial:
         return self.status in [Status.COMPLETED, Status.PRUNED]
 
     @property
-    def runtime(self) -> Optional[float]:
+    def runtime(self) -> Optional[timedelta]:
         """Return the runtime of the trial."""
         if self.end_time is not None:
             return self.end_time - self.start_time
         if self.start_time is not None:
-            return time.time() - self.start_time
+            return datetime.now() - self.start_time
         return None

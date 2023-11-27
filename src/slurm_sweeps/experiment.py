@@ -19,12 +19,10 @@ from .constants import (
     DB_ITERATION,
     DB_LOGGED,
     DB_PATH,
-    DB_TIMESTAMP,
     DB_TRIAL_ID,
     EXPERIMENT_NAME,
     STORAGE_PATH,
     TRAIN_PKL,
-    TRIAL_ID,
     WAITING_TIME_IN_SEC,
 )
 from .database import ExperimentExistsError, SqlDatabase
@@ -83,7 +81,7 @@ class Experiment:
             SlurmBackend() if SlurmBackend.is_running() else Backend()
         )
 
-        self._start_time: Optional[float] = None
+        self._start_time: Optional[datetime] = None
 
         # setting env variables for the logger in the trials
         os.environ[EXPERIMENT_NAME] = name
@@ -141,7 +139,7 @@ class Experiment:
         )
         self._print_run_info(len(trials), max_concurrent_trials)
 
-        self._start_time = time.time()
+        self._start_time = datetime.now()
         time_of_last_summary = time.time()
 
         scheduled_trials, running_trials, terminated_trials = copy(trials), [], []
@@ -161,7 +159,7 @@ class Experiment:
             # check for terminated trials
             for trial in copy(running_trials):
                 if trial.terminated:
-                    trial.end_time = time.time()
+                    trial.end_time = datetime.now()
 
                     _logger.debug(f"trial {trial.trial_id} {trial.status.value}")
 
@@ -199,7 +197,7 @@ class Experiment:
         )
 
         trial.process = self._backend.run(trial, self._storage)
-        trial.start_time = time.time()
+        trial.start_time = datetime.now()
 
         return trial
 
@@ -223,7 +221,7 @@ class Experiment:
     ):
         _logger.info("\n=== Status ===")
 
-        elapsed_time = time.time() - self._start_time
+        elapsed_time = datetime.now() - self._start_time
         nr_of_ct, nr_of_pt, nr_of_rt, nr_of_st = 0, 0, 0, 0
         for trial in trials:
             if trial.status == Status.COMPLETED:
@@ -236,7 +234,7 @@ class Experiment:
                 nr_of_st += 1
 
         _logger.info(
-            f"Elapsed time: {elapsed_time:.0f} s\n"
+            f"Elapsed time: {elapsed_time.seconds} s\n"
             f"Terminated trials: {nr_of_ct + nr_of_pt}/{len(trials)} "
             f"({nr_of_rt} running, {nr_of_ct} completed, {nr_of_pt} pruned)"
         )
@@ -245,9 +243,7 @@ class Experiment:
         summary_dicts = [
             {
                 "TRIAL_ID": trial.trial_id,
-                "START_TIME": time.ctime(trial.start_time)
-                if trial.start_time
-                else None,
+                "START_TIME": trial.start_time.ctime() if trial.start_time else None,
                 "STATUS": trial.status.value,
                 "RUNTIME": trial.runtime,
             }
