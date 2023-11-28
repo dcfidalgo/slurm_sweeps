@@ -54,10 +54,13 @@ class Trial:
         if self.process is None:
             return self._status
         if self.process.poll() is None:
-            return Status.RUNNING
-        if self.process.poll() == 0:
-            return Status.COMPLETED
-        return Status.PRUNED
+            self._status = Status.RUNNING
+        elif self.process.poll() == 0:
+            self._status = Status.COMPLETED
+        else:
+            self._status = Status.PRUNED
+
+        return self._status
 
     @status.setter
     def status(self, status: Optional[Union[str, Status]]):
