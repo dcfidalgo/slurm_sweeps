@@ -1,7 +1,7 @@
 import logging as _logging
 
 from .asha import ASHA
-from .backend import SlurmBackend
+from .backends import SlurmCfg
 from .experiment import Experiment
 from .logger import log
 from .sampler import Choice, Grid, LogUniform, Uniform
