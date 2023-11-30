@@ -1,23 +1,32 @@
-import os
-from pathlib import Path
 from typing import Dict, Optional, Union
 
 from .asha import ASHA
-from .constants import DB_ASHA, DB_PATH, EXPERIMENT_NAME, TRIAL_ID
+from .constants import DB_ASHA
 from .database import SqlDatabase
 
 
 class Logger:
-    """Log metrics to a slurm sweeps database and cancel trial if ASHA says so."""
+    """Log metrics to a slurm sweeps database and cancel trial if ASHA says so.
 
-    def __init__(self):
-        self._trial_id = os.environ[TRIAL_ID]
+    This class is a singleton!
 
-        if not Path(os.environ[DB_PATH]).is_file():
-            raise FileNotFoundError(f"Did not find a database at {os.environ[DB_PATH]}")
-        self._database = SqlDatabase(os.environ[EXPERIMENT_NAME], os.environ[DB_PATH])
+    Args:
+        trial_id:
+        database:
+    """
+
+    instance: Optional["Logger"] = None
+
+    def __init__(self, trial_id: str, database: SqlDatabase):
+        self._trial_id = trial_id
+        self._database = database
 
         self._asha: Optional[ASHA] = self._database.load(DB_ASHA)
+
+    def __new__(cls, *args, **kwargs):
+        if cls.instance is None:
+            cls.instance = super().__new__(cls)
+        return cls.instance
 
     def log(self, metrics: Dict[str, Union[float, int]], iteration: int):
         """Log metrics to the database.
@@ -30,11 +39,11 @@ class Logger:
 
         Raises:
             TrialPruned if the holy ASHA says so!
-            ValueError if a metric is not of type `float` or `int`.
+            TypeError if a metric is not of type `float` or `int`.
         """
         for metric, val in metrics.items():
             if type(val) not in (float, int):
-                raise ValueError(
+                raise TypeError(
                     f"You can only log metrics of type `float` or `int`. "
                     f"Your metric '{metric}' has type `{type(val)}`."
                 )
@@ -49,9 +58,6 @@ class Logger:
                 raise TrialPruned
 
 
-_LOGGER: Optional[Logger] = None
-
-
 def log(metrics: Dict[str, Union[float, int]], iteration: int):
     """Log metrics to the database.
 
@@ -63,13 +69,16 @@ def log(metrics: Dict[str, Union[float, int]], iteration: int):
 
     Raises:
         TrialPruned if the holy ASHA says so!
-        ValueError if a metric is not of type `float` or `int`.
+        TypeError if a metric is not of type `float` or `int`.
     """
-    global _LOGGER
-    if _LOGGER is None:
-        _LOGGER = Logger()
+    logger = Logger.instance
+    if logger is None:
+        raise TypeError(
+            "You first have to instantiate the `slurm_sweeps.logger.Logger` singleton "
+            "before calling the `slurm_sweeps.logger.log` function."
+        )
 
-    return _LOGGER.log(metrics, iteration)
+    return logger.log(metrics, iteration)
 
 
 class TrialPruned(Exception):
