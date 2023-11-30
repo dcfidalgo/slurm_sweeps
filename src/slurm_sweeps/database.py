@@ -62,8 +62,8 @@ class SqlDatabase:
 
     @property
     def path(self) -> Path:
-        """The path to the database file."""
-        return self._path
+        """The resolved absolute path to the database file."""
+        return self._path.resolve()
 
     @contextmanager
     def _connection(self):
@@ -152,12 +152,16 @@ class SqlDatabase:
                 ),
             )
 
-    def read_trials(self) -> List[Trial]:
+    def read_trials(self, trial_id: Optional[str] = None) -> List[Trial]:
         """Read the trials table and return a list of Trials."""
+        where = ""
+        if trial_id:
+            where = f"where {DB_TRIAL_ID} = '{trial_id}'"
+
         with self._connection() as con:
             response = con.execute(
                 f"""
-                select * from {self.experiment}{DB_TRIALS};
+                select * from {self.experiment}{DB_TRIALS} {where};
                 """
             ).fetchall()
 

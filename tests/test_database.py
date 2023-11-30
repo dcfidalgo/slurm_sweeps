@@ -174,6 +174,10 @@ def test_write_read_trials(database):
     trials[1].process = process
     assert trials[1] == trial2
 
+    trials = database.read_trials(trial_id=trials[0].trial_id)
+    assert len(trials) == 1
+    assert trials[0] == trial
+
 
 def test_write_read_metrics(database):
     with pytest.raises(ExperimentNotFoundError):
