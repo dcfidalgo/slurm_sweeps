@@ -104,11 +104,11 @@ python train.py
 
     # check output
     job_out = subprocess.check_output(["cat", "slurm-3.out"], cwd=tmp_path)
-    dataframe = SqlDatabase(local_dir / "slurm_sweeps.db").read("MySweep")
+    dataframe = SqlDatabase("MySweep", local_dir / "slurm_sweeps.db").read_metrics()
 
     # Relax until issue with slurm GitHub action is fixed: https://github.com/koesterlab/setup-slurm-action/issues/4
     assert ("max number of concurrent trials: 2" in job_out.decode()[50:]) or (
         "max number of concurrent trials: 4" in job_out.decode()[50:]
     )
-    assert len(dataframe) == 10
-    assert dataframe["ITERATION"].sort_values().iloc[-1] == 9
+    assert len(dataframe) > 10
+    assert dataframe[DB_ITERATION].sort_values().iloc[-1] == 9
