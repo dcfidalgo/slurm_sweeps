@@ -46,8 +46,8 @@ def test_readme_example_on_local(tmp_path):
     # Your results are stored in a pandas DataFrame
     print(f"\nBest trial:\n{dataframe.sort_values('loss').iloc[0]}")
 
-    assert len(dataframe) > 10
-    assert dataframe[DB_ITERATION].sort_values().iloc[-1] == 9
+    assert len(dataframe) == 10
+    assert dataframe["ITERATION"].sort_values().iloc[-1] == 9
 
 
 @pytest.mark.skipif(not is_slurm_available(), reason="requires a SLURM cluster")
@@ -110,5 +110,5 @@ python train.py
     assert ("max number of concurrent trials: 2" in job_out.decode()[50:]) or (
         "max number of concurrent trials: 4" in job_out.decode()[50:]
     )
-    assert len(dataframe) > 10
-    assert dataframe[DB_ITERATION].sort_values().iloc[-1] == 9
+    assert len(dataframe) == 10
+    assert dataframe["ITERATION"].sort_values().iloc[-1] == 9
