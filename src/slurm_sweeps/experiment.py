@@ -13,7 +13,6 @@ from .asha import ASHA
 from .backends import Backend, SlurmBackend, SlurmCfg
 from .constants import (
     DB_ASHA,
-    DB_CFG,
     DB_ITERATION,
     DB_LOGGED,
     DB_METRIC,
