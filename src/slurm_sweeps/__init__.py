@@ -1,14 +1,14 @@
-import logging
+import logging as _logging
 
 from .asha import ASHA
-from .backend import Backend, SlurmBackend
+from .backends import SlurmCfg
 from .experiment import Experiment
 from .logger import log
 from .sampler import Choice, Grid, LogUniform, Uniform
 
-_logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger = _logging.getLogger(__name__)
+_logger.setLevel(_logging.INFO)
 
-_handler = logging.StreamHandler()
+_handler = _logging.StreamHandler()
 
 _logger.addHandler(_handler)

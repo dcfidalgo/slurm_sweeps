@@ -1,8 +1,8 @@
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, List
 
 import numpy as np
 
-from .constants import DB_ITERATION, DB_TRIAL_ID
+from .constants import DB_ITERATION, DB_METRIC, DB_TRIAL_ID
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -43,15 +43,20 @@ class ASHA:
         ]
 
     @property
-    def metric(self):
+    def metric(self) -> str:
         """The metric to optimize."""
         return self._metric
+
+    @property
+    def mode(self) -> str:
+        """The 'mode' of the metric, either 'max' or 'min'."""
+        return self._mode
 
     def find_trials_to_prune(self, database: "pd.DataFrame") -> List[str]:
         """Check the database and find trials to prune.
 
         Args:
-            database: The database of the experiment as a pandas dataframe.
+            database: The experiment's metrics table of the database as a pandas DataFrame.
 
         Returns:
             List of trial ids that should be pruned.
@@ -60,21 +65,23 @@ class ASHA:
         if database[DB_ITERATION].min() == 0:
             database[DB_ITERATION] += 1
 
+        metric_column = f"{DB_METRIC}{self._metric}"
+
         trials = []
         for rung in self._rungs:
-            df = database[database[DB_ITERATION] == rung]
-            if df.empty:
+            df_r = database[database[DB_ITERATION] == rung]
+            if df_r.empty:
                 continue
 
-            nans = df[self._metric].isna()
+            nans = df_r[metric_column].isna()
 
             if self._mode == "min":
-                cutoff = np.nanpercentile(df[self._metric], 1 / self._rf * 100)
-                ids = df[self._metric] > cutoff
+                cutoff = np.nanpercentile(df_r[metric_column], 1 / self._rf * 100)
+                ids = df_r[metric_column] > cutoff
             else:
-                cutoff = np.nanpercentile(df[self._metric], (1 - 1 / self._rf) * 100)
-                ids = df[self._metric] < cutoff
+                cutoff = np.nanpercentile(df_r[metric_column], (1 - 1 / self._rf) * 100)
+                ids = df_r[metric_column] < cutoff
 
-            trials += list(df[nans | ids][DB_TRIAL_ID])
+            trials += list(df_r[nans | ids][DB_TRIAL_ID])
 
         return trials

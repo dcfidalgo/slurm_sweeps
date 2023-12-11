@@ -1,74 +1,205 @@
 import sqlite3
+import subprocess
+from contextlib import contextmanager
+from datetime import datetime
 from functools import partial
 from multiprocessing import Pool
-from typing import Dict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from slurm_sweeps.constants import DB_CFG, DB_ITERATION, DB_TIMESTAMP, DB_TRIAL_ID
-from slurm_sweeps.database import ExperimentExistsError, SqlDatabase
+from slurm_sweeps.constants import (
+    DB_CFG,
+    DB_END_TIME,
+    DB_EXPERIMENT,
+    DB_ITERATION,
+    DB_LOGGED,
+    DB_METRIC,
+    DB_METRICS,
+    DB_OBJECT_DATA,
+    DB_OBJECT_NAME,
+    DB_START_TIME,
+    DB_STATUS,
+    DB_STORAGE,
+    DB_TIMESTAMP,
+    DB_TRIAL_ID,
+    DB_TRIALS,
+)
+from slurm_sweeps.database import (
+    ExperimentExistsError,
+    ExperimentNotFoundError,
+    SqlDatabase,
+)
+from slurm_sweeps.trial import Trial
+
+
+@contextmanager
+def connection(path: Path):
+    con = sqlite3.connect(path, isolation_level=None)
+    try:
+        yield con
+    finally:
+        con.close()
 
 
 @pytest.fixture
 def database(tmp_path) -> SqlDatabase:
     db_path = tmp_path / "slurm_sweeps.db"
-    return SqlDatabase(db_path)
+    return SqlDatabase(experiment="test_experiment", path=db_path)
 
 
 def test_init(database):
     assert database.path.is_file()
 
+    with connection(database.path) as con:
+        check_exists = con.execute(
+            f"select name from sqlite_master where type='table' and name='{DB_STORAGE}';"
+        ).fetchone()
+        check_columns = con.execute(f"pragma table_info({DB_STORAGE})").fetchall()
+
+    assert check_exists == (DB_STORAGE,)
+    assert [(col[1], col[2], col[4]) for col in check_columns] == [
+        (DB_TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
+        (DB_EXPERIMENT, "TEXT", None),
+        (DB_OBJECT_NAME, "TEXT", None),
+        (DB_OBJECT_DATA, "BLOB", None),
+    ]
+
+
+def test_dump_load(database):
+    database.dump({"a": {}, "b": None})
+    # check if it is replaced, not added!
+    database.dump({"a": {}})
+
+    with connection(database.path) as con:
+        response = con.execute(f"select count(*) from {DB_STORAGE}").fetchone()
+
+    assert response[0] == 2
+    assert database.load("a") == {}
+    assert database.load("b") is None
+
+
+def test_exists(database):
+    assert database.exists() is False
+
+    database.create()
+    assert database.exists() is True
+
 
 def test_create(database):
-    experiment = "test_experiment"
-    database.create(experiment)
+    database.create()
 
-    con = sqlite3.connect(database.path)
-    check_exists = con.execute(
-        "select name from sqlite_master where type='table' and name='test_experiment';"
-    ).fetchone()
-    check_columns = con.execute(f"pragma table_info({experiment})").fetchall()
-    con.close()
-    assert check_exists == ("test_experiment",)
-    assert [(col[1], col[2], col[4]) for col in check_columns] == [
+    def query(table):
+        with connection(database.path) as con:
+            response_select = con.execute(
+                f"select name from sqlite_master where type='table' and name='{table}';"
+            ).fetchone()
+            response_pragma = con.execute(f"pragma table_info({table})").fetchall()
+
+        return response_select, response_pragma
+
+    # trials table
+    exists, columns = query(f"{database.experiment}{DB_TRIALS}")
+    assert exists == (f"{database.experiment}{DB_TRIALS}",)
+    assert [(col[1], col[2], col[4]) for col in columns] == [
+        (DB_TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
+        (DB_TRIAL_ID, "TEXT", None),
+        (DB_CFG, "TEXT", None),
+        (DB_START_TIME, "datetime", None),
+        (DB_END_TIME, "datetime", None),
+        (DB_STATUS, "TEXT", None),
+    ]
+
+    # metric table
+    exists, columns = query(f"{database.experiment}{DB_METRICS}")
+    assert exists == (f"{database.experiment}{DB_METRICS}",)
+    assert [(col[1], col[2], col[4]) for col in columns] == [
         (DB_TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
         (DB_TRIAL_ID, "TEXT", None),
         (DB_ITERATION, "INTEGER", None),
-        (DB_CFG, "TEXT", None),
     ]
 
     with pytest.raises(ExperimentExistsError):
-        database.create(experiment)
+        database.create()
 
-    database.write("test_experiment", {"test": 0})
-    database.create(experiment, overwrite=True)
+    database.write_metrics(trial_id="test", iteration=0, metrics={"loss": 0})
+    database.write_trial(Trial({}))
+    database.create(overwrite=True)
+
     # check if empty again
-    con = sqlite3.connect(database.path)
-    response = con.execute("select exists (select 1 from test_experiment);").fetchone()
-    con.close()
+
+    def query(table: str):
+        with connection(database.path) as con:
+            response = con.execute(f"select exists (select 1 from {table});").fetchone()
+
+        return response
+
+    response = query(f"{database.experiment}{DB_TRIALS}")
+    assert response == (0,)
+
+    response = query(f"{database.experiment}{DB_METRICS}")
     assert response == (0,)
 
 
-def test_write_and_read(database):
-    database.create("test_experiment")
-    database.write("test_experiment", {"test_int": 1, "test_float": 0.5})
+def test_write_read_trials(database):
+    database.create()
+    cfg = {"test": {"check": 5}, "this": [1, 2, 3]}
 
-    con = sqlite3.connect(database.path)
-    response = con.execute("select count(*) from test_experiment").fetchone()
-    con.close()
-    assert response == (1,)
+    trial = Trial(cfg=cfg, status="completed", start_time=datetime.now())
+    database.write_trial(trial)
+    trials = database.read_trials()
 
-    df = database.read("test_experiment")
+    assert trials[0] == trial
+
+    trial = Trial(cfg=cfg, status="pruned", end_time=datetime.now())
+    database.write_trial(trial)
+    trials = database.read_trials()
+
+    assert len(trials) == 1
+    assert trials[0] == trial
+
+    process = subprocess.Popen("echo")
+    trial2 = Trial(
+        cfg={**cfg, "and": "that"}, start_time=datetime.now(), process=process
+    )
+    database.write_trial(trial2)
+    trials = database.read_trials()
+
+    assert len(trials) == 2
+    assert trials[0] == trial
+
+    assert trials[1].process is None
+    trials[1].process = process
+    assert trials[1] == trial2
+
+    trials = database.read_trials(trial_id=trials[0].trial_id)
+    assert len(trials) == 1
+    assert trials[0] == trial
+
+
+def test_write_read_metrics(database):
+    with pytest.raises(ExperimentNotFoundError):
+        database.write_metrics(trial_id="test", iteration=0, metrics={"loss": 0.1})
+
+    database.create()
+    database.write_metrics(
+        trial_id="test", iteration=0, metrics={"test_int": 1, "test_float": 0.5}
+    )
+
+    df = database.read_metrics()
+
     assert isinstance(df, pd.DataFrame)
+    assert len(df) == 1
     assert list(df.columns) == [
         DB_TIMESTAMP,
         DB_TRIAL_ID,
         DB_ITERATION,
-        DB_CFG,
-        "test_int",
-        "test_float",
+        f"{DB_METRIC}test_int",
+        f"{DB_METRIC}test_int{DB_LOGGED}",
+        f"{DB_METRIC}test_float",
+        f"{DB_METRIC}test_float{DB_LOGGED}",
     ]
     assert type(df[DB_TIMESTAMP].iloc[0]) is str
     assert (
@@ -76,11 +207,40 @@ def test_write_and_read(database):
         .compare(
             pd.DataFrame(
                 {
-                    DB_TRIAL_ID: [np.nan],
-                    DB_ITERATION: [np.nan],
-                    DB_CFG: [np.nan],
-                    "test_int": [1],
-                    "test_float": [0.5],
+                    DB_TRIAL_ID: ["test"],
+                    DB_ITERATION: [0],
+                    f"{DB_METRIC}test_int": [1],
+                    f"{DB_METRIC}test_int{DB_LOGGED}": [1],
+                    f"{DB_METRIC}test_float": [0.5],
+                    f"{DB_METRIC}test_float{DB_LOGGED}": [1],
+                }
+            )
+        )
+        .empty
+    )
+    with connection(database.path) as con:
+        response = con.execute(
+            f"PRAGMA table_info({database.experiment}{DB_METRICS});"
+        ).fetchall()
+    assert response[-4][2] == "INTEGER"
+    assert response[-3][2] == "INTEGER"
+    assert response[-2][2] == "REAL"
+    assert response[-1][2] == "INTEGER"
+
+    database.write_metrics(trial_id="test", iteration=1, metrics={"test_int": 1.2})
+    df = database.read_metrics()
+    assert len(df) == 2
+    assert (
+        df.iloc[:, 1:]
+        .compare(
+            pd.DataFrame(
+                {
+                    DB_TRIAL_ID: ["test", "test"],
+                    DB_ITERATION: [0, 1],
+                    f"{DB_METRIC}test_int": [1.0, 1.2],
+                    f"{DB_METRIC}test_int{DB_LOGGED}": [1, 1],
+                    f"{DB_METRIC}test_float": [0.5, np.nan],
+                    f"{DB_METRIC}test_float{DB_LOGGED}": [1, np.nan],
                 }
             )
         )
@@ -88,43 +248,40 @@ def test_write_and_read(database):
     )
 
 
-def read_or_write(mode: str, database: SqlDatabase, experiment: str, row: Dict):
+def read_or_write(mode: str, database: SqlDatabase):
     if mode == "w":
-        database.write(experiment, row)
+        database.write_metrics(trial_id="test", iteration=0, metrics={"loss": 0.9})
     else:
-        database.read(experiment)
+        database.read_metrics(metric="loss")
 
 
 def test_concurrent_write_read(database):
-    experiment = "test_db_write_read"
-    n = 250
+    n = 100
 
-    database.create(experiment)
+    database.create()
+    database.write_metrics(trial_id="test", iteration=0, metrics={"loss": 0.9})
+
     args = np.random.choice(["w", "r"], size=n)
     with Pool(10) as p:
         p.map(
             partial(
                 read_or_write,
                 database=database,
-                experiment=experiment,
-                row={"loss": 0.2, "lr": 2},
             ),
             args,
         )
-    df = database.read(experiment)
+    df = database.read_metrics()
 
-    assert len(df) == sum(args == "w")
-    assert all([col in df.columns for col in [DB_TIMESTAMP, "loss", "lr"]])
+    assert len(df) == 1 + sum(args == "w")
+    assert all([col in df.columns for col in [DB_TIMESTAMP, f"{DB_METRIC}loss"]])
 
 
 def test_nan_values(database):
-    experiment = "test_db_nan"
-    database.create(experiment)
+    database.create()
 
-    database.write(experiment, {"loss": float("nan")})
-    df = database.read(experiment)
-    print(df)
-    assert np.isnan(df["loss"].iloc[0])
+    database.write_metrics(trial_id="test", iteration=0, metrics={"loss": float("nan")})
+    df = database.read_metrics()
+    assert np.isnan(df[f"{DB_METRIC}loss"].iloc[0])
 
 
 @pytest.mark.skip("Only for speed comparisons")
