@@ -35,10 +35,10 @@ class Experiment:
         cfg: A dict passed on to the `train` function.
             It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
         name: The name of the experiment.
-        local_dir: Where to store and run the experiments. In this directory
+        local_dir: Where to store and run the experiments. In this directory,
             we will create the database `slurm_sweeps.db` and a folder with the experiment name.
-        slurm_cfg: A `SlurmCfg` instance passed on to the `slurm_sweeps.backends.SlurmBackend`.
-            We automatically choose this backend when slurm sweeps is used within a sbatch script.
+        slurm_cfg: The configuration of the Slurm backend responsible for running the trials.
+            We automatically choose this backend when slurm sweeps is used within an sbatch script.
         asha: An optional ASHA instance to cancel less promising trials.
         restore: Restore an experiment with the same name?
         overwrite: Overwrite an existing experiment with the same name?
@@ -120,17 +120,17 @@ class Experiment:
         """Run the experiment.
 
         Args:
-            n_trials: Number of trials to run. For grid searches this parameter is ignored.
+            n_trials: Number of trials to run. For grid searches, this parameter is ignored.
             max_concurrent_trials: The maximum number of trials running concurrently. By default, we will set this to
-                the number of cpus available, or the number of total Slurm tasks divided by the number of trial Slurm
-                tasks requested.
+                the number of cpus available, or the number of total Slurm tasks divided by the number of tasks
+                requested per trial.
             summary_interval_in_sec: Print a summary of the experiment every x seconds.
             nr_of_rows_in_summary: How many rows of the summary table should we print?
             summarize_cfg_and_metrics: Should we include the cfg and the metrics in the summary table?
                 You can also pass in a list of strings to only select a few cfg and metric keys.
 
         Returns:
-            A DataFrame of the database.
+            A summary of the trials in a pandas DataFrame.
         """
         trials = [
             Trial(cfg=cfg, status="scheduled") for cfg in Sampler(self._cfg, n_trials)

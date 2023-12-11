@@ -43,12 +43,12 @@ class ASHA:
         ]
 
     @property
-    def metric(self):
+    def metric(self) -> str:
         """The metric to optimize."""
         return self._metric
 
     @property
-    def mode(self):
+    def mode(self) -> str:
         """The 'mode' of the metric, either 'max' or 'min'."""
         return self._mode
 

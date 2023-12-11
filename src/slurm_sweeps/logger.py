@@ -38,8 +38,8 @@ class Logger:
             iteration: Iteration of the metrics. Most of the time this will be the epoch.
 
         Raises:
-            TrialPruned if the holy ASHA says so!
-            TypeError if a metric is not of type `float` or `int`.
+            `TrialPruned` if the holy ASHA says so!
+            `TypeError` if a metric is not of type `float` or `int`.
         """
         for metric, val in metrics.items():
             if type(val) not in (float, int):
@@ -68,8 +68,8 @@ def log(metrics: Dict[str, Union[float, int]], iteration: int):
         iteration: Iteration of the metrics. Most of the time this will be the epoch.
 
     Raises:
-        TrialPruned if the holy ASHA says so!
-        TypeError if a metric is not of type `float` or `int`.
+        `TrialPruned` if the holy ASHA says so!
+        `TypeError` if a metric is not of type `float` or `int`.
     """
     logger = Logger.instance
     if logger is None:
