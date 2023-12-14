@@ -275,6 +275,21 @@ class Database:
                 df = df.replace([None], float("nan"))
             return df
 
+    def get_logged_metrics(self) -> List[str]:
+        """Returns the names of the logged metrics."""
+        with self._connection() as con:
+            response = con.execute(
+                f"pragma table_info({self.experiment}{DB_METRICS})"
+            ).fetchall()
+
+        metrics = [
+            col[1].replace(DB_METRIC, "", 1)
+            for col in response
+            if (col[1].startswith(DB_METRIC) and not col[1].endswith(DB_LOGGED))
+        ]
+
+        return metrics
+
     def dump(self, data: Dict[str, Any]):
         """Pickles and dumps the data to the storage table.
 
@@ -307,6 +322,8 @@ class Database:
                 f"where {DB_EXPERIMENT}='{self.experiment}' and {DB_OBJECT_NAME}='{name}'"
             ).fetchone()
 
+        if response is None:
+            return None
         return cloudpickle.loads(response[0])
 
 

@@ -33,6 +33,7 @@ class Trial:
         start_time: The start time of the trial.
         end_time: The end time of the trial.
         status: Status of the trial. If `process` is not None, we will always query the process for the status.
+        metrics: Logged metrics of the trial.
     """
 
     cfg: Dict
@@ -41,6 +42,7 @@ class Trial:
     end_time: Optional[datetime] = None
     status: Optional[Union[str, Status]] = None
     _status: Optional[Status] = field(init=False, repr=False)
+    metrics: Optional[Dict[str, Dict[int, Union[int, float]]]] = None
 
     @property
     def trial_id(self) -> str:
@@ -72,7 +74,7 @@ class Trial:
     @property
     def runtime(self) -> Optional[timedelta]:
         """The runtime of the trial."""
-        if self.end_time is not None:
+        if self.end_time is not None and self.start_time is not None:
             return self.end_time - self.start_time
         if self.start_time is not None:
             return datetime.now() - self.start_time
