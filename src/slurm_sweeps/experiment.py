@@ -20,7 +20,7 @@ from .constants import (
     DB_TRIAL_ID,
     WAITING_TIME_IN_SEC,
 )
-from .database import ExperimentExistsError, ExperimentNotFoundError, SqlDatabase
+from .database import Database, ExperimentExistsError, ExperimentNotFoundError
 from .sampler import Sampler
 from .trial import Status, Trial
 
@@ -61,7 +61,7 @@ class Experiment:
 
         self._create_experiment_dir(self._local_dir / name, restore, overwrite)
 
-        self._database = SqlDatabase(self.name, self.local_dir / "slurm_sweeps.db")
+        self._database = Database(self.name, self.local_dir / "slurm_sweeps.db")
         if not restore:
             self._database.create(overwrite=overwrite)
         elif not self._database.exists():

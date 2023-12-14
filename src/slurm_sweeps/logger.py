@@ -2,7 +2,7 @@ from typing import Dict, Optional, Union
 
 from .asha import ASHA
 from .constants import DB_ASHA
-from .database import SqlDatabase
+from .database import Database
 
 
 class Logger:
@@ -17,7 +17,7 @@ class Logger:
 
     instance: Optional["Logger"] = None
 
-    def __init__(self, trial_id: str, database: SqlDatabase):
+    def __init__(self, trial_id: str, database: Database):
         self._trial_id = trial_id
         self._database = database
 

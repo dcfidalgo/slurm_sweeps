@@ -28,7 +28,7 @@ from .constants import (
 from .trial import Trial
 
 
-class SqlDatabase:
+class Database:
     """An SQLite database that stores the trials of an experiment and their metrics.
 
     It also serves as a storage for pickled objects.
