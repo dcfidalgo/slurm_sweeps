@@ -49,7 +49,7 @@ import slurm_sweeps as ss
 def train(cfg: dict):
     for epoch in range(cfg["epochs"]):
         sleep(0.5)
-        loss = (cfg["parameter"] - 1) ** 2 * epoch
+        loss = (cfg["parameter"] - 1) ** 2 / (epoch + 1)
         # log your metrics
         ss.log({"loss": loss}, epoch)
 
@@ -66,10 +66,10 @@ experiment = ss.Experiment(
 
 
 # Run your experiment
-dataframe = experiment.run(n_trials=1000)
+result = experiment.run(n_trials=1000)
 
-# Your results are stored in a pandas DataFrame
-print(f"\nBest trial:\n{dataframe.sort_values('loss').iloc[0]}")
+# Show the best performing trial
+print(result.best_trial())
 ```
 
 Or submit it to a SLURM cluster.
@@ -250,6 +250,110 @@ A configuration class for the SlurmBackend.
 - `nodes` - How many nodes do you request for your srun?
 - `ntasks` - How many tasks do you request for your srun?
 - `args` - Additional command line arguments for srun, formatted as a string.
+
+### CLASS `slurm_sweeps.Result`
+
+```python
+class Result(
+    experiment: str,
+    local_dir: Union[str, Path] = "./slurm-sweeps",
+)
+```
+
+The result of an experiment.
+
+**Arguments**:
+
+- `experiment` - The name of the experiment.
+- `local_dir` - The directory where we find the `slurm-sweeps.db` database.
+
+#### `Result.experiment`
+
+```python
+@property
+def experiment() -> str
+```
+
+The name of the experiment.
+
+#### `Result.trials`
+
+```python
+@property
+def trials() -> List[Trial]
+```
+
+A list of the trials of the experiment.
+
+#### `Result.best_trial`
+
+```python
+def best_trial(
+    metric: Optional[str] = None,
+    mode: Optional[str] = None
+) -> Trial
+```
+
+Get the best performing trial of the experiment.
+
+**Arguments**:
+
+- `metric` - The metric. By default, we take the one defined by ASHA.
+- `mode` - The mode of the metric, either 'min' or 'max'. By default, we take the one defined by ASHA.
+
+**Returns**:
+
+  The best trial.
+
+### CLASS `slurm_sweeps.trial.Trial`
+
+```python
+@dataclass
+class Trial:
+    cfg: Dict
+    process: Optional[subprocess.Popen] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    status: Optional[Union[str, Status]] = None
+    metrics: Optional[Dict[str, Dict[int, Union[int, float]]]] = None
+```
+
+A trial of an experiment.
+
+**Arguments**:
+
+- `cfg` - The config of the trial.
+- `process` - The subprocess that runs the trial.
+- `start_time` - The start time of the trial.
+- `end_time` - The end time of the trial.
+- `status` - Status of the trial. If `process` is not None, we will always query the process for the status.
+- `metrics` - Logged metrics of the trial.
+
+#### `Trial.trial_id`
+
+```python
+@property
+def trial_id() -> str
+```
+
+The trial ID is a 6-digit hash from the config.
+
+#### `Trial.runtime`
+
+```python
+@property
+def runtime() -> Optional[timedelta]
+```
+
+The runtime of the trial.
+
+#### `Trial.is_terminated`
+
+```python
+def is_terminated() -> bool
+```
+
+Return True, if the trial has been completed or pruned.
 
 ### FUNCTION `slurm_sweeps.log`
 
