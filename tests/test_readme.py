@@ -112,5 +112,7 @@ python train.py
     assert len(result.trials) == 10
 
     trial = result.best_trial()
+    print(result.trials)
+    print(trial)
 
     assert trial.metrics["loss"][9] < 0.05
