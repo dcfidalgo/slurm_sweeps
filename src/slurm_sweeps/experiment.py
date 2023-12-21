@@ -7,6 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Callable, Dict, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 
 from .asha import ASHA
@@ -20,11 +21,105 @@ from .constants import (
     DB_TRIAL_ID,
     WAITING_TIME_IN_SEC,
 )
-from .database import ExperimentExistsError, ExperimentNotFoundError, SqlDatabase
+from .database import Database, ExperimentExistsError, ExperimentNotFoundError
 from .sampler import Sampler
 from .trial import Status, Trial
 
 _logger = logging.getLogger(__name__)
+
+
+class Result:
+    """The result of an experiment.
+
+    Args:
+        experiment: The name of the experiment.
+        local_dir: The directory where we find the `slurm-sweeps.db` database.
+    """
+
+    def __init__(
+        self,
+        experiment: str,
+        local_dir: Union[str, Path] = "./slurm-sweeps",
+    ):
+        self._experiment = experiment
+        self._database = Database(experiment, Path(local_dir) / "slurm-sweeps.db")
+        if not self._database.exists():
+            raise ExperimentNotFoundError(experiment)
+
+    @property
+    def experiment(self) -> str:
+        """The name of the experiment."""
+        return self._experiment
+
+    @property
+    def trials(self) -> List[Trial]:
+        """A list of the trials of the experiment."""
+        trials = self._database.read_trials()
+
+        metrics = self._database.get_logged_metrics()
+        for metric in metrics:
+            metric_df = self._database.read_metrics(metric)
+            metric_by_trial = metric_df.groupby(DB_TRIAL_ID)
+            for trial in trials:
+                df = metric_by_trial.get_group(trial.trial_id).sort_values(DB_ITERATION)
+                trial_metrics = {
+                    metric: {
+                        row[1][DB_ITERATION]: row[1][f"{DB_METRIC}{metric}"]
+                        for row in df.iterrows()
+                    }
+                }
+                if trial.metrics is None:
+                    trial.metrics = trial_metrics
+                else:
+                    trial.metrics.update(trial_metrics)
+
+        return trials
+
+    def best_trial(
+        self, metric: Optional[str] = None, mode: Optional[str] = None
+    ) -> Trial:
+        """Get the best performing trial of the experiment.
+
+        Args:
+            metric: The metric. By default, we take the one defined by ASHA.
+            mode: The mode of the metric, either 'min' or 'max'. By default, we take the one defined by ASHA.
+
+        Returns:
+            The best trial.
+        """
+        asha: Optional[ASHA] = None
+        if metric is None or mode is None:
+            asha = self._database.load(DB_ASHA)
+
+        if (metric is None or mode is None) and asha is None:
+            raise ValueError(
+                "ASHA was not defined, and you did not specify a `metric` or `mode`. "
+                "Please specify both of them."
+            )
+
+        metric = metric or asha.metric
+        mode = mode or asha.mode
+        if mode not in ("min", "max"):
+            raise ValueError(f"`mode` has to be either 'min' or 'max', but is '{mode}'")
+
+        trials = self.trials
+
+        trial, best_metric = None, np.inf if mode == "min" else -np.inf
+        for trial in trials:
+            metrics = np.array(list(trial.metrics.get(metric, {}).values()))
+            if metrics.size == 0:
+                continue
+            if mode == "min" and metrics.min() < best_metric:
+                best_metric, best_trial = metrics.min(), trial
+            elif mode == "max" and metrics.max() > best_metric:
+                best_metric, best_trial = metrics.max(), trial
+
+        if trial is None:
+            raise ValueError(
+                f"None of the trials contain the metric '{metric}', cannot determine best trial."
+            )
+
+        return trial
 
 
 class Experiment:
@@ -61,7 +156,7 @@ class Experiment:
 
         self._create_experiment_dir(self._local_dir / name, restore, overwrite)
 
-        self._database = SqlDatabase(self.name, self.local_dir / "slurm_sweeps.db")
+        self._database = Database(self.name, self.local_dir / "slurm-sweeps.db")
         if not restore:
             self._database.create(overwrite=overwrite)
         elif not self._database.exists():
@@ -116,7 +211,7 @@ class Experiment:
         summary_interval_in_sec: float = 5.0,
         nr_of_rows_in_summary: int = 10,
         summarize_cfg_and_metrics: Union[bool, List[str]] = True,
-    ) -> pd.DataFrame:
+    ) -> Result:
         """Run the experiment.
 
         Args:
@@ -172,7 +267,9 @@ class Experiment:
             # print current summary
             if (time.time() - time_of_last_summary) > summary_interval_in_sec:
                 self._print_summary(
-                    running_trials + scheduled_trials + terminated_trials,
+                    list(
+                        reversed(scheduled_trials + terminated_trials + running_trials)
+                    ),
                     n_rows=nr_of_rows_in_summary,
                     summarize_cfg_and_metrics=summarize_cfg_and_metrics,
                 )
@@ -183,14 +280,14 @@ class Experiment:
                 time.sleep(WAITING_TIME_IN_SEC)
 
         # print final summary
-        summary_df = self._print_summary(
+        self._print_summary(
             terminated_trials,
             n_rows=None,
             summarize_cfg_and_metrics=summarize_cfg_and_metrics,
             sort_by="RUNTIME",
         )
 
-        return summary_df
+        return Result(self.name, self.local_dir)
 
     def _run_trial(self, trials: List[Trial], trial_nr: int) -> Trial:
         trial = trials[trial_nr]

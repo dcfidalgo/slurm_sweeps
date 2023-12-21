@@ -28,9 +28,9 @@ from slurm_sweeps.constants import (
     DB_TRIALS,
 )
 from slurm_sweeps.database import (
+    Database,
     ExperimentExistsError,
     ExperimentNotFoundError,
-    SqlDatabase,
 )
 from slurm_sweeps.trial import Trial
 
@@ -45,9 +45,9 @@ def connection(path: Path):
 
 
 @pytest.fixture
-def database(tmp_path) -> SqlDatabase:
+def database(tmp_path) -> Database:
     db_path = tmp_path / "slurm_sweeps.db"
-    return SqlDatabase(experiment="test_experiment", path=db_path)
+    return Database(experiment="test_experiment", path=db_path)
 
 
 def test_init(database):
@@ -79,6 +79,7 @@ def test_dump_load(database):
     assert response[0] == 2
     assert database.load("a") == {}
     assert database.load("b") is None
+    assert database.load("c") is None
 
 
 def test_exists(database):
@@ -248,7 +249,7 @@ def test_write_read_metrics(database):
     )
 
 
-def read_or_write(mode: str, database: SqlDatabase):
+def read_or_write(mode: str, database: Database):
     if mode == "w":
         database.write_metrics(trial_id="test", iteration=0, metrics={"loss": 0.9})
     else:
@@ -284,8 +285,9 @@ def test_nan_values(database):
     assert np.isnan(df[f"{DB_METRIC}loss"].iloc[0])
 
 
-@pytest.mark.skip("Only for speed comparisons")
+@pytest.mark.skip("Only for speed comparisons (OUTDATED!)")
 def test_speed(monkeypatch, database):
+    # TODO: Update!
     from slurm_sweeps.constants import DB_PATH, EXPERIMENT_NAME
     from slurm_sweeps.logger import Logger
 

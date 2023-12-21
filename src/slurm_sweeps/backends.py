@@ -9,7 +9,7 @@ from typing import Optional
 import yaml
 
 from .constants import CFG_YML, DB_TRAIN, TRAIN_PY
-from .database import SqlDatabase
+from .database import Database
 from .trial import Trial
 
 
@@ -38,7 +38,7 @@ class Backend:
         database: The database of the experiment.
     """
 
-    def __init__(self, execution_dir: Path, database: SqlDatabase):
+    def __init__(self, execution_dir: Path, database: Database):
         self._execution_dir = execution_dir
         self._database = database
 
@@ -78,10 +78,10 @@ class Backend:
         """The python script that executes the train function."""
         template = dedent(
             f"""\
-            from slurm_sweeps.database import SqlDatabase
+            from slurm_sweeps.database import Database
             from slurm_sweeps.logger import Logger
 
-            database = SqlDatabase("{self._database.experiment}", "{self._database.path}")
+            database = Database("{self._database.experiment}", "{self._database.path}")
             train = database.load("{DB_TRAIN}")
             trial = database.read_trials(trial_id="{trial_id}")[0]
 
@@ -110,7 +110,7 @@ class SlurmBackend(Backend):
     """
 
     def __init__(
-        self, execution_dir: Path, database: SqlDatabase, cfg: Optional[SlurmCfg] = None
+        self, execution_dir: Path, database: Database, cfg: Optional[SlurmCfg] = None
     ):
         super().__init__(execution_dir=execution_dir, database=database)
 

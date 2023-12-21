@@ -28,7 +28,7 @@ from .constants import (
 from .trial import Trial
 
 
-class SqlDatabase:
+class Database:
     """An SQLite database that stores the trials of an experiment and their metrics.
 
     It also serves as a storage for pickled objects.
@@ -38,7 +38,7 @@ class SqlDatabase:
         path: The path to the database file.
     """
 
-    def __init__(self, experiment: str, path: Union[str, Path] = "./slurm_sweeps.db"):
+    def __init__(self, experiment: str, path: Union[str, Path] = "./slurm-sweeps.db"):
         self._experiment = experiment
         self._path = Path(path).resolve()
 
@@ -275,6 +275,21 @@ class SqlDatabase:
                 df = df.replace([None], float("nan"))
             return df
 
+    def get_logged_metrics(self) -> List[str]:
+        """Returns the names of the logged metrics."""
+        with self._connection() as con:
+            response = con.execute(
+                f"pragma table_info({self.experiment}{DB_METRICS})"
+            ).fetchall()
+
+        metrics = [
+            col[1].replace(DB_METRIC, "", 1)
+            for col in response
+            if (col[1].startswith(DB_METRIC) and not col[1].endswith(DB_LOGGED))
+        ]
+
+        return metrics
+
     def dump(self, data: Dict[str, Any]):
         """Pickles and dumps the data to the storage table.
 
@@ -307,6 +322,8 @@ class SqlDatabase:
                 f"where {DB_EXPERIMENT}='{self.experiment}' and {DB_OBJECT_NAME}='{name}'"
             ).fetchone()
 
+        if response is None:
+            return None
         return cloudpickle.loads(response[0])
 
 
