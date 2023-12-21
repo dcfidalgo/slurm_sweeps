@@ -29,14 +29,27 @@ _logger = logging.getLogger(__name__)
 
 
 class Result:
+    """The result of an experiment.
+
+    Args:
+        experiment: The name of the experiment.
+        local_dir: The directory where we find the `slurm-sweeps.db` database.
+    """
+
     def __init__(
         self,
         experiment: str,
-        db_path: Union[str, Path] = "./slurm_sweeps.db",
+        local_dir: Union[str, Path] = "./slurm-sweeps",
     ):
-        self._database = Database(experiment, db_path)
+        self._experiment = experiment
+        self._database = Database(experiment, Path(local_dir) / "slurm-sweeps.db")
         if not self._database.exists():
             raise ExperimentNotFoundError(experiment)
+
+    @property
+    def experiment(self) -> str:
+        """The name of the experiment."""
+        return self._experiment
 
     @property
     def trials(self) -> List[Trial]:
@@ -143,7 +156,7 @@ class Experiment:
 
         self._create_experiment_dir(self._local_dir / name, restore, overwrite)
 
-        self._database = Database(self.name, self.local_dir / "slurm_sweeps.db")
+        self._database = Database(self.name, self.local_dir / "slurm-sweeps.db")
         if not restore:
             self._database.create(overwrite=overwrite)
         elif not self._database.exists():
@@ -274,7 +287,7 @@ class Experiment:
             sort_by="RUNTIME",
         )
 
-        return Result(self.name, self._database.path)
+        return Result(self.name, self.local_dir)
 
     def _run_trial(self, trials: List[Trial], trial_nr: int) -> Trial:
         trial = trials[trial_nr]
