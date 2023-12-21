@@ -3,8 +3,7 @@ from time import sleep
 
 import pytest
 
-from slurm_sweeps.constants import DB_ITERATION
-from slurm_sweeps.database import SqlDatabase
+from slurm_sweeps import Result
 
 
 def is_slurm_available() -> bool:
@@ -25,7 +24,7 @@ def test_readme_example_on_local(tmp_path):
     def train(cfg: dict):
         for epoch in range(cfg["epochs"]):
             sleep(0.5)
-            loss = (cfg["parameter"] - 1) ** 2 * epoch
+            loss = (cfg["parameter"] - 1) ** 2 / (epoch + 1)
             # log your metrics
             ss.log({"loss": loss}, epoch)
 
@@ -41,13 +40,13 @@ def test_readme_example_on_local(tmp_path):
     )
 
     # Run your experiment
-    dataframe = experiment.run(n_trials=10)
+    result = experiment.run(n_trials=10)
 
-    # Your results are stored in a pandas DataFrame
-    print(f"\nBest trial:\n{dataframe.sort_values('loss').iloc[0]}")
+    assert len(result.trials) == 10
 
-    assert len(dataframe) == 10
-    assert dataframe["ITERATION"].sort_values().iloc[-1] == 9
+    trial = result.best_trial()
+
+    assert trial.metrics["loss"][9] < 0.05
 
 
 @pytest.mark.skipif(not is_slurm_available(), reason="requires a SLURM cluster")
@@ -104,11 +103,14 @@ python train.py
 
     # check output
     job_out = subprocess.check_output(["cat", "slurm-3.out"], cwd=tmp_path)
-    dataframe = SqlDatabase("MySweep", local_dir / "slurm_sweeps.db").read_metrics()
+    result = Result("MySweep", local_dir)
 
     # Relax until issue with slurm GitHub action is fixed: https://github.com/koesterlab/setup-slurm-action/issues/4
     assert ("max number of concurrent trials: 2" in job_out.decode()[50:]) or (
         "max number of concurrent trials: 4" in job_out.decode()[50:]
     )
-    assert len(dataframe) > 10
-    assert dataframe[DB_ITERATION].sort_values().iloc[-1] == 9
+    assert len(result.trials) == 10
+
+    trial = result.best_trial()
+
+    assert trial.metrics["loss"][9] < 0.05
