@@ -38,7 +38,7 @@ class Database:
         path: The path to the database file.
     """
 
-    def __init__(self, experiment: str, path: Union[str, Path] = "./slurm_sweeps.db"):
+    def __init__(self, experiment: str, path: Union[str, Path] = "./slurm-sweeps.db"):
         self._experiment = experiment
         self._path = Path(path).resolve()
 
