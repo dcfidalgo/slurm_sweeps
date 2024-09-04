@@ -135,4 +135,4 @@ dmypy.json
 */wandb
 */MNIST
 */lightning_logs
-tests/slurm_sweeps
+tests/slurm-sweeps
