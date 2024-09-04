@@ -11,7 +11,6 @@ import yaml
 from .constants import (
     DB_CFG,
     DB_END_TIME,
-    DB_EXPERIMENT,
     DB_ITERATION,
     DB_LOGGED,
     DB_METRIC,
@@ -42,19 +41,6 @@ class Database:
         self._experiment = experiment
         self._path = Path(path).resolve()
 
-        if not self.path.exists():
-            with self._connection() as con:
-                con.execute(
-                    f"""
-                    create table {DB_STORAGE} (
-                        {DB_TIMESTAMP} datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),
-                        {DB_EXPERIMENT} text not null,
-                        {DB_OBJECT_NAME} text not null,
-                        {DB_OBJECT_DATA} blob,
-                        unique({DB_EXPERIMENT}, {DB_OBJECT_NAME})
-                    );"""
-                )
-
     @property
     def experiment(self) -> str:
         """The name of the experiment."""
@@ -63,7 +49,7 @@ class Database:
     @property
     def path(self) -> Path:
         """The resolved absolute path to the database file."""
-        return self._path.resolve()
+        return self._path
 
     @contextmanager
     def _connection(self):
@@ -78,10 +64,11 @@ class Database:
         with self._connection() as con:
             response = con.execute(
                 f"select name from sqlite_master where type='table' "
-                f"and name in ('{self.experiment}{DB_TRIALS}', '{self.experiment}{DB_METRICS}')"
+                "and name in "
+                f"('{self.experiment}{DB_STORAGE}', '{self.experiment}{DB_TRIALS}', '{self.experiment}{DB_METRICS}')"
             ).fetchall()
 
-        return len(response) == 2
+        return len(response) == 3
 
     def create(self, overwrite: bool = False):
         """Create the trials and metrics table for the experiment.
@@ -94,16 +81,29 @@ class Database:
         """
         with self._connection() as con:
             if overwrite:
+                con.execute(f"drop table if exists {self.experiment}{DB_STORAGE};")
                 con.execute(f"drop table if exists {self.experiment}{DB_TRIALS};")
                 con.execute(f"drop table if exists {self.experiment}{DB_METRICS};")
 
             try:
+                self._create_storage_table(con)
                 self._create_trials_table(con)
                 self._create_metrics_table(con)
             except sqlite3.OperationalError as err:
                 if "already exists" in str(err):
                     raise ExperimentExistsError(self.experiment) from err
                 raise err
+
+    def _create_storage_table(self, con: sqlite3.Connection):
+        """Helper method to create the storage table."""
+        con.execute(
+            f"""
+            create table {self.experiment}{DB_STORAGE} (
+                {DB_TIMESTAMP} datetime default(strftime('%Y-%m-%d %H:%M:%f', 'NOW')),
+                {DB_OBJECT_NAME} text primary key,
+                {DB_OBJECT_DATA} blob
+            );"""
+        )
 
     def _create_trials_table(self, con: sqlite3.Connection):
         """Helper method to create the trials table."""
@@ -216,7 +216,7 @@ class Database:
 
     @staticmethod
     def _add_prefix_and_logged_flag(
-        metrics: Dict[str, Union[int, float]]
+        metrics: Dict[str, Union[int, float]],
     ) -> Dict[str, Union[int, float]]:
         """Helper method to change the metrics into the right format."""
         return {
@@ -296,14 +296,11 @@ class Database:
         Args:
             data: A dictionary with the names and the corresponding objects to be pickled.
         """
-        data = [
-            (self.experiment, name, cloudpickle.dumps(obj))
-            for name, obj in data.items()
-        ]
+        data = [(name, cloudpickle.dumps(obj)) for name, obj in data.items()]
         with self._connection() as con:
             con.executemany(
-                f"insert or replace into {DB_STORAGE}({DB_EXPERIMENT}, {DB_OBJECT_NAME}, {DB_OBJECT_DATA}) "
-                f"values(?, ?, ?);",
+                f"insert or replace into {self.experiment}{DB_STORAGE}({DB_OBJECT_NAME}, {DB_OBJECT_DATA}) "
+                f"values(?, ?);",
                 data,
             )
 
@@ -318,8 +315,8 @@ class Database:
         """
         with self._connection() as con:
             response = con.execute(
-                f"select {DB_OBJECT_DATA} from {DB_STORAGE} "
-                f"where {DB_EXPERIMENT}='{self.experiment}' and {DB_OBJECT_NAME}='{name}'"
+                f"select {DB_OBJECT_DATA} from {self.experiment}{DB_STORAGE} "
+                f"where {DB_OBJECT_NAME}='{name}'"
             ).fetchone()
 
         if response is None:
@@ -331,7 +328,7 @@ class ExperimentNotFoundError(Exception):
     def __init__(self, experiment: str, *args, **kwargs):
         msg = (
             f"An experiment with the name '{experiment}' was not found in the database."
-            f"\n\tYou can create one by calling `SqlDatabase(...).create()` "
+            f"\n\tYou can create one by calling `Database(...).create()` "
             f"or by setting `Experiment(..., restore=False)`."
         )
         super().__init__(msg, *args, **kwargs)

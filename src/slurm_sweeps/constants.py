@@ -1,7 +1,7 @@
 # DB tables
 DB_TRIALS = "_trials"
 DB_METRICS = "_metrics"
-DB_STORAGE = "storage"
+DB_STORAGE = "_storage"
 
 # DB trials keys
 DB_TIMESTAMP = "timestamp"
@@ -17,7 +17,6 @@ DB_METRIC = "metric_"
 DB_LOGGED = "_logged"
 
 # DB storage keys
-DB_EXPERIMENT = "experiment"
 DB_OBJECT_NAME = "object_name"
 DB_OBJECT_DATA = "object_data"
 DB_ASHA = "asha"

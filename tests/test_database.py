@@ -13,7 +13,6 @@ import pytest
 from slurm_sweeps.constants import (
     DB_CFG,
     DB_END_TIME,
-    DB_EXPERIMENT,
     DB_ITERATION,
     DB_LOGGED,
     DB_METRIC,
@@ -50,36 +49,9 @@ def database(tmp_path) -> Database:
     return Database(experiment="test_experiment", path=db_path)
 
 
-def test_init(database):
-    assert database.path.is_file()
-
-    with connection(database.path) as con:
-        check_exists = con.execute(
-            f"select name from sqlite_master where type='table' and name='{DB_STORAGE}';"
-        ).fetchone()
-        check_columns = con.execute(f"pragma table_info({DB_STORAGE})").fetchall()
-
-    assert check_exists == (DB_STORAGE,)
-    assert [(col[1], col[2], col[4]) for col in check_columns] == [
-        (DB_TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
-        (DB_EXPERIMENT, "TEXT", None),
-        (DB_OBJECT_NAME, "TEXT", None),
-        (DB_OBJECT_DATA, "BLOB", None),
-    ]
-
-
-def test_dump_load(database):
-    database.dump({"a": {}, "b": None})
-    # check if it is replaced, not added!
-    database.dump({"a": {}})
-
-    with connection(database.path) as con:
-        response = con.execute(f"select count(*) from {DB_STORAGE}").fetchone()
-
-    assert response[0] == 2
-    assert database.load("a") == {}
-    assert database.load("b") is None
-    assert database.load("c") is None
+def test_init():
+    database = Database(experiment="mock", path=".")
+    assert database.path.is_absolute()
 
 
 def test_exists(database):
@@ -100,6 +72,15 @@ def test_create(database):
             response_pragma = con.execute(f"pragma table_info({table})").fetchall()
 
         return response_select, response_pragma
+
+    # storage table
+    exists, columns = query(f"{database.experiment}{DB_STORAGE}")
+    assert exists == (f"{database.experiment}{DB_STORAGE}",)
+    assert [(col[1], col[2], col[4]) for col in columns] == [
+        (DB_TIMESTAMP, "datetime", "strftime('%Y-%m-%d %H:%M:%f', 'NOW')"),
+        (DB_OBJECT_NAME, "TEXT", None),
+        (DB_OBJECT_DATA, "BLOB", None),
+    ]
 
     # trials table
     exists, columns = query(f"{database.experiment}{DB_TRIALS}")
@@ -142,6 +123,23 @@ def test_create(database):
 
     response = query(f"{database.experiment}{DB_METRICS}")
     assert response == (0,)
+
+
+def test_dump_load(database):
+    database.create()
+    database.dump({"a": {}, "b": None})
+    # check if it is replaced, not added!
+    database.dump({"a": {}})
+
+    with connection(database.path) as con:
+        response = con.execute(
+            f"select count(*) from {database.experiment}{DB_STORAGE}"
+        ).fetchone()
+
+    assert response[0] == 2
+    assert database.load("a") == {}
+    assert database.load("b") is None
+    assert database.load("c") is None
 
 
 def test_write_read_trials(database):
