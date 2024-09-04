@@ -28,6 +28,10 @@ class Logger:
             cls.instance = super().__new__(cls)
         return cls.instance
 
+    @property
+    def trial_id(self) -> str:
+        return self._trial_id
+
     def log(self, metrics: Dict[str, Union[float, int]], iteration: int):
         """Log metrics to the database.
 
@@ -49,12 +53,12 @@ class Logger:
                 )
 
         self._database.write_metrics(
-            trial_id=self._trial_id, iteration=iteration, metrics=metrics
+            trial_id=self.trial_id, iteration=iteration, metrics=metrics
         )
 
         if self._asha is not None:
             df = self._database.read_metrics(self._asha.metric)
-            if self._trial_id in self._asha.find_trials_to_prune(df):
+            if self.trial_id in self._asha.find_trials_to_prune(df):
                 raise TrialPruned
 
 

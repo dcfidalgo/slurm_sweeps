@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.plugins.environments import SLURMEnvironment
 
 import slurm_sweeps as ss
+from slurm_sweeps.logger import Logger
 
 
 class SlurmSweepsCallback(pl.Callback):
@@ -44,11 +45,8 @@ class SlurmSweepsCallback(pl.Callback):
         stage: Optional[str] = None,
     ) -> None:
         if self._wandb:
-            self._wandb.init(
-                name=self._logger.trial.trial_id,
-                config=self._logger.trial.cfg,
-                **self._wandb_init_kwargs
-            )
+            logger = Logger.instance
+            self._wandb.init(name=logger.trial_id, **self._wandb_init_kwargs)
 
     @pl.utilities.rank_zero.rank_zero_only
     def on_validation_end(
