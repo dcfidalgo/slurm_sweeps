@@ -55,16 +55,16 @@ def train(cfg):
     val_loader = DataLoader(dataset_val, batch_size=128)
 
     # set up environment for ddp
-    plugins = ParallelSlurmEnvironment(auto_requeue=False)
-    os.environ["MASTER_ADDR"] = "localhost"
+    # plugins = ParallelSlurmEnvironment(auto_requeue=False)
+    # os.environ["MASTER_ADDR"] = "localhost"
 
     # model
     model = Model(lr=cfg["lr"])
 
     # train model
     trainer = pl.Trainer(
-        strategy="ddp",
-        devices=4,
+        # strategy="ddp",
+        devices=1,
         accelerator="gpu",
         max_epochs=cfg["max_epochs"],
         callbacks=SlurmSweepsCallback(
@@ -74,7 +74,7 @@ def train(cfg):
                 project=cfg["wandb_project"], group=cfg["wandb_group"], config=cfg
             ),
         ),
-        plugins=plugins,
+        # plugins=plugins,
     )
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         },
         name="LightningIntegration",
         asha=ss.ASHA(metric="val_loss", mode="min", reduction_factor=2, max_t=2),
-        backend=ss.SlurmBackend(nodes=1, ntasks=4),
+        # backend=ss.SlurmBackend(nodes=1, ntasks=4),
     )
 
     experiment.run(

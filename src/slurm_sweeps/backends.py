@@ -39,7 +39,7 @@ class Backend:
     """
 
     def __init__(self, execution_dir: Path, database: Database):
-        self._execution_dir = execution_dir
+        self._execution_dir = execution_dir.resolve()
         self._database = database
 
     @property
