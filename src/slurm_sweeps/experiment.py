@@ -104,7 +104,7 @@ class Result:
 
         trials = self.trials
 
-        trial, best_metric = None, np.inf if mode == "min" else -np.inf
+        best_trial, best_metric = None, np.inf if mode == "min" else -np.inf
         for trial in trials:
             metrics = np.array(list(trial.metrics.get(metric, {}).values()))
             if metrics.size == 0:
@@ -114,12 +114,12 @@ class Result:
             elif mode == "max" and metrics.max() > best_metric:
                 best_metric, best_trial = metrics.max(), trial
 
-        if trial is None:
+        if best_trial is None:
             raise ValueError(
                 f"None of the trials contain the metric '{metric}', cannot determine best trial."
             )
 
-        return trial
+        return best_trial
 
 
 class Experiment:

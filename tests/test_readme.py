@@ -60,7 +60,7 @@ from time import sleep
 def train(cfg: dict):
     for epoch in range(cfg["epochs"]):
         sleep(0.5)
-        loss = (cfg["parameter"] - 1) ** 2 * epoch
+        loss = (cfg["parameter"] - 1) ** 2 / (epoch + 1)
         # log your metrics
         ss.log({{"loss": loss}}, epoch)
 
