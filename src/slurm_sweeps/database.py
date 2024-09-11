@@ -132,9 +132,9 @@ class Database:
 
     def write_trial(self, trial: Trial):
         """Add a trial to the experiment trials table."""
-        start_time = str(trial.start_time) if trial.start_time else trial.start_time
-        end_time = str(trial.end_time) if trial.end_time else trial.end_time
-        status = trial.status.value if trial.status else trial.status
+        start_time = str(trial.start_time) if trial.start_time else None
+        end_time = str(trial.end_time) if trial.end_time else None
+        status = trial.status.value if trial.status else None
 
         with self._connection() as con:
             con.execute(
