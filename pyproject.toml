@@ -13,6 +13,7 @@ dependencies = [
     "numpy",
     "pandas",
     "pyyaml",
+    "scipy"
 ]
 
 [tool.isort]
