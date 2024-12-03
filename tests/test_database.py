@@ -275,12 +275,34 @@ def test_concurrent_write_read(database):
     assert all([col in df.columns for col in [DB_TIMESTAMP, f"{DB_METRIC}loss"]])
 
 
-def test_nan_values(database):
+def test_nan_values(database: Database):
     database.create()
 
     database.write_metrics(trial_id="test", iteration=0, metrics={"loss": float("nan")})
     df = database.read_metrics()
     assert np.isnan(df[f"{DB_METRIC}loss"].iloc[0])
+
+
+def test_data_for_tpe(database: Database):
+    database.create()
+    cfg = {"test": {"check": 5}, "this": [1, 2, 3]}
+
+    trial = Trial(cfg=cfg, status="completed", start_time=datetime.now())
+    database.write_trial(trial)
+    database.write_metrics(trial_id=trial.trial_id, iteration=0, metrics={"loss": 3.2})
+    database.write_metrics(trial_id=trial.trial_id, iteration=1, metrics={"loss": 3.0})
+    database.write_metrics(trial_id=trial.trial_id, iteration=1, metrics={"loss2": 3.0})
+
+    cfg = {"test": {"check": 3}, "this": [1, 2, 3]}
+    trial = Trial(cfg=cfg, status="running", start_time=datetime.now())
+    database.write_trial(trial)
+    database.write_metrics(trial_id=trial.trial_id, iteration=0, metrics={"loss": 2.8})
+
+    data = database.read_data_for_tpe(metric="loss")
+
+    assert isinstance(data, pd.DataFrame)
+    print(data)
+    assert False
 
 
 @pytest.mark.skip("Only for speed comparisons (OUTDATED!)")

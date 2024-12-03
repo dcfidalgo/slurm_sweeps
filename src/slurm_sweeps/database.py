@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -25,6 +26,13 @@ from .constants import (
     DB_TRIALS,
 )
 from .trial import Trial
+
+
+@dataclass
+class TpeDataPoint:
+    iteration: int
+    metric: float
+    cfg: Dict[str, Any]
 
 
 class Database:
@@ -322,6 +330,36 @@ class Database:
         if response is None:
             return None
         return cloudpickle.loads(response[0])
+
+    def read_data_for_tpe(self, metric: str) -> List[TpeDataPoint]:
+        select = f"{DB_ITERATION}, {DB_METRIC}{metric}, {self.experiment}{DB_TRIALS}.{DB_CFG}"
+        on = f"{self.experiment}{DB_METRICS}.{DB_TRIAL_ID} = {self.experiment}{DB_TRIALS}.{DB_TRIAL_ID}"
+        query = (
+            f"select {select} from {self.experiment}{DB_METRICS} "
+            f"inner join {self.experiment}{DB_TRIALS} ON {on} "
+            f"where {DB_METRIC}{metric}{DB_LOGGED} = 1;"
+        )
+
+        with self._connection() as con:
+            try:
+                response = con.execute(query).fetchall()
+            except sqlite3.OperationalError as err:
+                if f"no such column: {DB_METRIC}{metric}" not in str(err):
+                    raise err
+                else:
+                    response = None
+
+        if response:
+            data = [
+                TpeDataPoint(
+                    iteration=row[0], metric=row[1], cfg=yaml.safe_load(row[2])
+                )
+                for row in response
+            ]
+        else:
+            data = []
+
+        return data
 
 
 class ExperimentNotFoundError(Exception):
