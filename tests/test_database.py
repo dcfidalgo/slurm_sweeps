@@ -30,6 +30,7 @@ from slurm_sweeps.database import (
     Database,
     ExperimentExistsError,
     ExperimentNotFoundError,
+    TpeDataPoint,
 )
 from slurm_sweeps.trial import Trial
 
@@ -300,9 +301,8 @@ def test_data_for_tpe(database: Database):
 
     data = database.read_data_for_tpe(metric="loss")
 
-    assert isinstance(data, pd.DataFrame)
-    print(data)
-    assert False
+    assert isinstance(data, list)
+    assert isinstance(data[0], TpeDataPoint)
 
 
 @pytest.mark.skip("Only for speed comparisons (OUTDATED!)")
