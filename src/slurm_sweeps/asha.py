@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, List
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, List, Literal, Optional
 
 import numpy as np
 
@@ -8,38 +9,51 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-class ASHA:
-    """Basic implementation of the Asynchronous Successive Halving Algorithm (ASHA) to prune unpromising trials.
+@dataclass
+class AshaConfig:
+    """A configuration class for the ASHA algorithm.
 
     Args:
-        metric: The metric you want to optimize.
-        mode: Should the metric be minimized or maximized? Allowed values: ["min", "max"]
         reduction_factor: The reduction factor of the algorithm
         min_t: Minimum number of iterations before we consider pruning.
         max_t: Maximum number of iterations.
     """
 
+    reduction_factor: int = 4
+    min_t: int = 1
+    max_t: int = 50
+
+
+class ASHA:
+    """Basic implementation of the Asynchronous Successive Halving Algorithm (ASHA) to prune unpromising trials.
+
+    Args:
+        metric: The metric you want to optimize.
+        mode: Should the metric be minimized or maximized? Allowed values: ["min", "max"].
+        config: The configuration for the algorithm.
+    """
+
     def __init__(
         self,
         metric: str,
-        mode: str,
-        reduction_factor: int = 4,
-        min_t: int = 1,
-        max_t: int = 50,
+        mode: Literal["min", "max"],
+        config: AshaConfig,
     ):
         self._metric = metric
         self._mode = mode
-        self._rf = reduction_factor
-        self._min_t = min_t
-        self._max_t = max_t
+        self._config = config
 
-        assert mode == "min" or mode == "max"
-        assert reduction_factor > 1
-        assert max_t > min_t > 0
+        assert self._mode == "min" or self._mode == "max"
+        assert self._config.reduction_factor > 1
+        assert self._config.max_t > self._config.min_t > 0
 
-        rung_max = int(np.log(self._max_t / self._min_t) / np.log(self._rf))
+        rung_max = int(
+            np.log(self._config.max_t / self._config.min_t)
+            / np.log(self._config.reduction_factor)
+        )
         self._rungs = [
-            self._min_t * (self._rf**i) for i in reversed(range(rung_max + 1))
+            self._config.min_t * (self._config.reduction_factor**i)
+            for i in reversed(range(rung_max + 1))
         ]
 
     @property
@@ -76,10 +90,14 @@ class ASHA:
             nans = df_r[metric_column].isna()
 
             if self._mode == "min":
-                cutoff = np.nanpercentile(df_r[metric_column], 1 / self._rf * 100)
+                cutoff = np.nanpercentile(
+                    df_r[metric_column], 1 / self._config.reduction_factor * 100
+                )
                 ids = df_r[metric_column] > cutoff
             else:
-                cutoff = np.nanpercentile(df_r[metric_column], (1 - 1 / self._rf) * 100)
+                cutoff = np.nanpercentile(
+                    df_r[metric_column], (1 - 1 / self._config.reduction_factor) * 100
+                )
                 ids = df_r[metric_column] < cutoff
 
             trials += list(df_r[nans | ids][DB_TRIAL_ID])

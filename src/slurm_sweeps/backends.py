@@ -14,7 +14,7 @@ from .trial import Trial
 
 
 @dataclass
-class SlurmCfg:
+class SlurmConfig:
     """A configuration class for the SlurmBackend.
 
     Args:
@@ -110,22 +110,25 @@ class SlurmBackend(Backend):
     """
 
     def __init__(
-        self, execution_dir: Path, database: Database, cfg: Optional[SlurmCfg] = None
+        self,
+        execution_dir: Path,
+        database: Database,
+        config: Optional[SlurmConfig] = None,
     ):
         super().__init__(execution_dir=execution_dir, database=database)
 
-        self._cfg = cfg or SlurmCfg()
+        self._config = config or SlurmConfig()
 
     @property
     def max_concurrent_trials(self) -> int:
         """This equals the total number of SLURM tasks requested."""
-        return int(int(os.environ["SLURM_NTASKS"]) / self._cfg.ntasks)
+        return int(int(os.environ["SLURM_NTASKS"]) / self._config.ntasks)
 
     def _build_args(self, train_path: Path) -> str:
         """Build arguments for the subprocess."""
         slurm_cmd = (
-            f"srun {'--exclusive' if self._cfg.exclusive else ''} "
-            f"--nodes={self._cfg.nodes} --ntasks={self._cfg.ntasks} {self._cfg.args} "
+            f"srun {'--exclusive' if self._config.exclusive else ''} "
+            f"--nodes={self._config.nodes} --ntasks={self._config.ntasks} {self._config.args} "
         )
         return slurm_cmd + super()._build_args(train_path)
 
