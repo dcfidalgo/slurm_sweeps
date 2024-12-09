@@ -136,3 +136,6 @@ dmypy.json
 */MNIST
 */lightning_logs
 tests/slurm-sweeps
+
+# benchmarks
+benchmarks/slurm-sweeps

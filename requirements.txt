@@ -1,0 +1,12 @@
+-e .
+# for development
+pre_commit
+pydoc-markdown
+# for tests and benchmarks
+lightning
+pytest
+pytest-cov
+torch
+torchvision
+wandb
+rich

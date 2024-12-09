@@ -57,6 +57,7 @@ class Logger:
         )
 
         if self._asha is not None:
+            # TODO: ASHA should get its own database function with a defined data structure as output
             df = self._database.read_metrics(self._asha.metric)
             if self.trial_id in self._asha.find_trials_to_prune(df):
                 raise TrialPruned

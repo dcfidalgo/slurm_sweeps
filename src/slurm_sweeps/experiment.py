@@ -2,16 +2,17 @@ import logging
 import shutil
 import time
 from copy import copy
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
 
-from .asha import ASHA
-from .backends import Backend, SlurmBackend, SlurmCfg
+from .asha import ASHA, AshaConfig
+from .backends import Backend, SlurmBackend, SlurmConfig
 from .constants import (
     DB_ASHA,
     DB_ITERATION,
@@ -23,6 +24,7 @@ from .constants import (
 )
 from .database import Database, ExperimentExistsError, ExperimentNotFoundError
 from .sampler import Sampler
+from .tpe import TPE, TpeConfig, TpeSampler
 from .trial import Status, Trial
 
 _logger = logging.getLogger(__name__)
@@ -33,7 +35,7 @@ class Result:
 
     Args:
         experiment: The name of the experiment.
-        local_dir: The directory where we find the `slurm-sweeps.db` database.
+        local_dir: The directory where we look for the `slurm-sweeps.db` database.
     """
 
     def __init__(
@@ -122,6 +124,25 @@ class Result:
         return best_trial
 
 
+@dataclass
+class SweepConfig:
+    """Configure the sweep.
+
+    Args:
+        metric: Metric to optimize.
+        mode: Minimize or maximize the metric? Possible values: "min" or "max".
+        use_asha: Use the ASHA scheduler to prune weak trials?
+            You can also pass in a `AshaConfig` to configure the scheduler.
+        use_tpe: Use a Tree-Structured Parzen Estimator to suggest new trials?
+            You can also pass in a `TpeConfig` to configure the estimator.
+    """
+
+    metric: str
+    mode: Literal["min", "max"]
+    use_asha: Union[bool, AshaConfig] = True
+    use_tpe: Union[bool, TpeConfig] = True
+
+
 class Experiment:
     """Set up an HPO experiment.
 
@@ -132,12 +153,14 @@ class Experiment:
         name: The name of the experiment.
         local_dir: Where to store and run the experiments. In this directory,
             we will create the database `slurm_sweeps.db` and a folder with the experiment name.
-        slurm_cfg: The configuration of the Slurm backend responsible for running the trials.
+        sweep_config: Configure which metric you want to minimize/maximize, and if you want to use ASHA and/or TPE.
+        slurm_config: The configuration of the Slurm backend responsible for running the trials.
             We automatically choose this backend when slurm sweeps is used within an sbatch script.
-        asha: An optional ASHA instance to cancel less promising trials.
         restore: Restore an experiment with the same name?
         overwrite: Overwrite an existing experiment with the same name?
     """
+
+    # TODO: put name, local_dir, restore, overwrite into a ExperimentConfig class
 
     def __init__(
         self,
@@ -145,8 +168,8 @@ class Experiment:
         cfg: Dict,
         name: str = "MySweep",
         local_dir: Union[str, Path] = "./slurm-sweeps",
-        asha: Optional[ASHA] = None,
-        slurm_cfg: Optional[SlurmCfg] = None,
+        sweep_config: Optional[SweepConfig] = None,
+        slurm_config: Optional[SlurmConfig] = None,
         restore: bool = False,
         overwrite: bool = False,
     ):
@@ -162,13 +185,38 @@ class Experiment:
         elif not self._database.exists():
             raise ExperimentNotFoundError(self.name)
 
+        asha = None
+        if sweep_config and sweep_config.use_asha:
+            asha = ASHA(
+                metric=sweep_config.metric,
+                mode=sweep_config.mode,
+                config=(
+                    sweep_config.use_asha
+                    if isinstance(sweep_config.use_asha, AshaConfig)
+                    else AshaConfig()
+                ),
+            )
+
         self._database.dump({DB_TRAIN: train, DB_ASHA: asha})
+
+        if sweep_config and sweep_config.use_tpe:
+            tpe = TPE(
+                metric=sweep_config.metric,
+                mode=sweep_config.mode,
+                database=self._database,
+                config=sweep_config.use_tpe
+                if isinstance(sweep_config.use_tpe, TpeConfig)
+                else TpeConfig(),
+            )
+            self._sampler = TpeSampler(cfg, tpe)
+        else:
+            self._sampler = Sampler(cfg)
 
         if SlurmBackend.is_running():
             self._backend = SlurmBackend(
                 execution_dir=self._local_dir / name,
                 database=self._database,
-                cfg=slurm_cfg,
+                config=slurm_config,
             )
         else:
             self._backend = Backend(
@@ -215,7 +263,7 @@ class Experiment:
         """Run the experiment.
 
         Args:
-            n_trials: Number of trials to run. For grid searches, this parameter is ignored.
+            n_trials: Number of trials to run.
             max_concurrent_trials: The maximum number of trials running concurrently. By default, we will set this to
                 the number of cpus available, or the number of total Slurm tasks divided by the number of tasks
                 requested per trial.
@@ -225,30 +273,32 @@ class Experiment:
                 You can also pass in a list of strings to only select a few cfg and metric keys.
 
         Returns:
-            A summary of the trials in a pandas DataFrame.
+            The result of the experiment with all its trials.
         """
-        trials = [
-            Trial(cfg=cfg, status="scheduled") for cfg in Sampler(self._cfg, n_trials)
-        ]
         max_concurrent_trials = (
             max_concurrent_trials or self._backend.max_concurrent_trials
         )
-        self._print_run_info(len(trials), max_concurrent_trials)
+
+        self._print_run_info(n_trials, max_concurrent_trials)
 
         self._start_time = datetime.now()
         time_of_last_summary = time.time()
 
-        scheduled_trials, running_trials, terminated_trials = copy(trials), [], []
+        running_trials, terminated_trials = [], []
 
         while len(terminated_trials) < n_trials:
             trial_nr = len(terminated_trials) + len(running_trials)
 
-            # run trial
+            # run new trial
             if (trial_nr < n_trials) and (len(running_trials) < max_concurrent_trials):
-                trial = self._run_trial(trials, trial_nr)
+                trial = Trial(cfg=self._sampler(), status="scheduled")
+
+                _logger.debug(
+                    f"{trial_nr}/{n_trials}: run trial {trial.trial_id} with config:\n\t{trial.cfg}"
+                )
+                self._run_trial(trial)
 
                 running_trials.append(trial)
-                scheduled_trials.remove(trial)
 
                 continue
 
@@ -267,15 +317,13 @@ class Experiment:
             # print current summary
             if (time.time() - time_of_last_summary) > summary_interval_in_sec:
                 self._print_summary(
-                    list(
-                        reversed(scheduled_trials + terminated_trials + running_trials)
-                    ),
+                    list(reversed(terminated_trials + running_trials)),
                     n_rows=nr_of_rows_in_summary,
                     summarize_cfg_and_metrics=summarize_cfg_and_metrics,
                 )
                 time_of_last_summary = time.time()
 
-            # wait if the maximum nr of concurrent trials are running, or wait for the last trials to finish
+            # wait if the maximum nr of concurrent trials are running, or wait for the last trial to finish
             if len(running_trials) == max_concurrent_trials or trial_nr == n_trials:
                 time.sleep(WAITING_TIME_IN_SEC)
 
@@ -289,23 +337,15 @@ class Experiment:
 
         return Result(self.name, self.local_dir)
 
-    def _run_trial(self, trials: List[Trial], trial_nr: int) -> Trial:
-        trial = trials[trial_nr]
-
+    def _run_trial(self, trial: Trial):
         # first write trial to database, then call backend.run !!!
         self._database.write_trial(trial)
-
-        _logger.debug(
-            f"{trial_nr}/{len(trials)}: run trial {trial.trial_id} with config:\n\t{trial.cfg}"
-        )
 
         trial.process = self._backend.run(trial)
         trial.start_time = datetime.now()
 
         # update the status
         self._database.write_trial(trial)
-
-        return trial
 
     def _print_run_info(self, nr_trials: int, max_concurrent_trials: int):
         _logger.info(

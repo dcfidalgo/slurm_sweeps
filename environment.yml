@@ -12,10 +12,12 @@ dependencies:
   - pip
   - pip:
       - -e .
-      # for tests
+      # for development
+      - pre_commit
+      - pydoc-markdown
+      # for tests and benchmarks
       - pytest
       - pytest-cov
       - lightning
       - wandb
-      # for development
-      - pre_commit
+      - rich

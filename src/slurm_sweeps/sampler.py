@@ -21,11 +21,11 @@ class Uniform(Random):
     """
 
     def __init__(self, low: float, high: float, seed: Optional[int] = None):
-        self._low, self._high = low, high
+        self.low, self.high = low, high
         self._rng = np.random.default_rng(seed=seed)
 
     def __call__(self) -> float:
-        return float(self._rng.uniform(self._low, self._high))
+        return float(self._rng.uniform(self.low, self.high))
 
 
 class LogUniform(Random):
@@ -39,11 +39,11 @@ class LogUniform(Random):
 
     def __init__(self, low: float, high: float, seed: Optional[int] = None):
         assert 0 < low < high
-        self._low, self._high = np.log(low), np.log(high)
+        self.low, self.high = np.log(low), np.log(high)
         self._rng = np.random.default_rng(seed=seed)
 
     def __call__(self) -> float:
-        return float(np.exp(self._rng.uniform(self._low, self._high)))
+        return float(np.exp(self._rng.uniform(self.low, self.high)))
 
 
 class Choice(Random):
@@ -83,45 +83,44 @@ class Grid:
 
 
 class Sampler:
-    """Sample from a cfg dict.
+    """A sampler for random and grid search.
 
-    This iterable yields samples of the search space defined in the cfg dict.
+    Use its call method to sample from the cfg dict.
 
     Args:
-        cfg: The cfg dict
-        n: Number of samples this iterable yields. Will be ignored if the cfg dict defines a grid search space.
+        cfg: The cfg dict.
     """
 
-    def __init__(self, cfg: Dict[str, Any], n: int = 1):
+    def __init__(self, cfg: Dict[str, Any]):
         self._cfg = cfg
-        self._n = n
-        self._grid = self._extract_grid(cfg) or None
 
-    def _extract_grid(self, cfg: Dict[str, Any]) -> List[List[Any]]:
+        self._grid = None
+        self._grid_axes = self._extract_grid_axes(cfg)
+        if self._grid_axes:
+            self._grid = itertools.product(*self._grid_axes)
+
+    def _extract_grid_axes(self, cfg: Dict[str, Any]) -> List[List[Any]]:
         grids = []
         for val in cfg.values():
             if isinstance(val, Grid):
                 grids.append(val())
             elif isinstance(val, dict):
-                grids += self._extract_grid(val)
+                grids += self._extract_grid_axes(val)
 
         return grids
 
-    def __iter__(self):
-        if self._grid is None:
-            yield from self._random_iterator(self._n)
-        else:
-            yield from self._grid_iterator()
+    def __call__(self) -> dict:
+        grid_values = None
+        if self._grid:
+            try:
+                grid_values = list(next(self._grid))
+            except StopIteration:
+                self._grid = itertools.product(*self._grid_axes)
+                grid_values = list(next(self._grid))
 
-    def _grid_iterator(self):
-        for grid_values in itertools.product(*self._grid):
-            yield self._sample(self._cfg, list(grid_values))
+        return self._sample(self._cfg, grid_values)
 
-    def _random_iterator(self, n: int):
-        for _ in range(n):
-            yield self._sample(self._cfg)
-
-    def _sample(self, cfg, grid_values: Optional[List[Any]] = None):
+    def _sample(self, cfg: Dict[str, Any], grid_values: Optional[List[Any]] = None):
         suggested_cfg = {}
         for key, val in cfg.items():
             if isinstance(val, Random):
