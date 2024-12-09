@@ -13,8 +13,9 @@
   </a>
 </p>
 
-The main motivation was to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) for
-[SLURM clusters](https://slurm.schedmd.com/overview.html) that is fully compatible with
+The main motivation was to provide a lightweight [ASHA implementation](https://arxiv.org/abs/1810.05934) and
+[TPE algorithm](https://arxiv.org/abs/2304.11127) for [SLURM clusters](https://slurm.schedmd.com/overview.html)
+that is fully compatible with
 [pytorch-lightning's ddp](https://lightning.ai/docs/pytorch/stable/accelerators/gpu_intermediate.html#distributed-data-parallel).
 
 It is heavily inspired by tools like [Ray Tune](https://www.ray.io/ray-tune) and [Optuna](https://optuna.org/).
@@ -34,6 +35,7 @@ pip install slurm-sweeps
 - numpy
 - pandas
 - pyyaml
+- scipy
 
 ## Usage
 You can just run this example on your laptop.
@@ -61,9 +63,9 @@ experiment = ss.Experiment(
         "epochs": 10,
         "parameter": ss.Uniform(0, 2),
     },
-    asha=ss.ASHA(metric="loss", mode="min"),
+    local_dir=tmp_path / "slurm_sweeps",
+    sweep_config=ss.SweepConfig(metric="loss", mode="min")
 )
-
 
 # Run your experiment
 result = experiment.run(n_trials=1000)
@@ -104,8 +106,8 @@ class Experiment(
     cfg: Dict,
     name: str = "MySweep",
     local_dir: Union[str, Path] = "./slurm-sweeps",
-    asha: Optional[ASHA] = None,
-    slurm_cfg: Optional[SlurmCfg] = None,
+    sweep_config: Optional[SweepConfig] = None,
+    slurm_config: Optional[SlurmConfig] = None,
     restore: bool = False,
     overwrite: bool = False,
 )
@@ -121,9 +123,9 @@ Set up an HPO experiment.
 - `name` - The name of the experiment.
 - `local_dir` - Where to store and run the experiments. In this directory,
   we will create the database `slurm_sweeps.db` and a folder with the experiment name.
-- `slurm_cfg` - The configuration of the Slurm backend responsible for running the trials.
+- `sweep_config`: Configure which metric you want to minimize/maximize, and if you want to use ASHA and/or TPE.
+- `slurm_config` - The configuration of the Slurm backend responsible for running the trials.
   We automatically choose this backend when slurm sweeps is used within an sbatch script.
-- `asha` - An optional ASHA instance to cancel less promising trials.
 - `restore` - Restore an experiment with the same name?
 - `overwrite` - Overwrite an existing experiment with the same name?
 
