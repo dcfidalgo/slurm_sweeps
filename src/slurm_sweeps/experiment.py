@@ -35,7 +35,7 @@ class Result:
 
     Args:
         experiment: The name of the experiment.
-        local_dir: The directory where we find the `slurm-sweeps.db` database.
+        local_dir: The directory where we look for the `slurm-sweeps.db` database.
     """
 
     def __init__(
@@ -273,7 +273,7 @@ class Experiment:
                 You can also pass in a list of strings to only select a few cfg and metric keys.
 
         Returns:
-            A summary of the trials in a pandas DataFrame.
+            The result of the experiment with all its trials.
         """
         max_concurrent_trials = (
             max_concurrent_trials or self._backend.max_concurrent_trials

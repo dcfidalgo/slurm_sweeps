@@ -98,284 +98,242 @@ See the `tests` folder for an advanced example of training a PyTorch model with 
 
 ## API Documentation
 
-### `CLASS slurm_sweeps.Experiment`
+### FUNC `slurm_sweeps.log`
+```python
+def log(
+    metrics: Dict[str, Union[int, float]],
+    iteration: int
+)
+```
+Log metrics to the database.
 
+If ASHA is configured, this also checks if the trial needs to be pruned.
+
+**Arguments**
+- `metrics`: A dictionary containing the metrics.
+- `iteration`: Iteration of the metrics. Most of the time this will be the epoch.
+
+**Raises**
+- `TrialPruned` if the holy ASHA says so!
+- `TypeError` if a metric is not of type `float` or `int`.
+
+
+### CLASS `slurm_sweeps.Experiment`
 ```python
 class Experiment(
     train: Callable,
     cfg: Dict,
-    name: str = "MySweep",
-    local_dir: Union[str, Path] = "./slurm-sweeps",
-    sweep_config: Optional[SweepConfig] = None,
-    slurm_config: Optional[SlurmConfig] = None,
+    name: str = 'MySweep',
+    local_dir: Union[str, pathlib.Path] = './slurm-sweeps',
+    sweep_config: Optional[slurm_sweeps.experiment.SweepConfig] = None,
+    slurm_config: Optional[slurm_sweeps.backends.SlurmConfig] = None,
     restore: bool = False,
-    overwrite: bool = False,
+    overwrite: bool = False
 )
 ```
-
 Set up an HPO experiment.
 
-**Arguments**:
-
-- `train` - A train function that takes as input the `cfg` dict.
-- `cfg` - A dict passed on to the `train` function.
-  It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
-- `name` - The name of the experiment.
-- `local_dir` - Where to store and run the experiments. In this directory,
-  we will create the database `slurm_sweeps.db` and a folder with the experiment name.
+**Arguments**
+- `train`: A train function that takes as input the `cfg` dict.
+- `cfg`: A dict passed on to the `train` function. It must contain the search spaces via `slurm_sweeps.Uniform`, `slurm_sweeps.Choice`, etc.
+- `name`: The name of the experiment.
+- `local_dir`: Where to store and run the experiments. In this directory, we will create the database `slurm_sweeps.db` and a folder with the experiment name.
 - `sweep_config`: Configure which metric you want to minimize/maximize, and if you want to use ASHA and/or TPE.
-- `slurm_config` - The configuration of the Slurm backend responsible for running the trials.
-  We automatically choose this backend when slurm sweeps is used within an sbatch script.
-- `restore` - Restore an experiment with the same name?
-- `overwrite` - Overwrite an existing experiment with the same name?
+- `slurm_config`: The configuration of the Slurm backend responsible for running the trials. We automatically choose this backend when slurm sweeps is used within an sbatch script.
+- `restore`: Restore an experiment with the same name?
+- `overwrite`: Overwrite an existing experiment with the same name?
+
+#### `Experiment.local_dir`
+```python
+@property
+def local_dir() -> pathlib.Path
+```
+The local directory of the experiment.
 
 #### `Experiment.name`
-
 ```python
 @property
 def name() -> str
 ```
-
 The name of the experiment.
 
-#### `Experiment.local_dir`
-
-```python
-@property
-def local_dir() -> Path
-```
-
-The local directory of the experiment.
-
 #### `Experiment.run`
-
 ```python
 def run(
+    self,
     n_trials: int = 1,
     max_concurrent_trials: Optional[int] = None,
     summary_interval_in_sec: float = 5.0,
     nr_of_rows_in_summary: int = 10,
     summarize_cfg_and_metrics: Union[bool, List[str]] = True
-) -> pd.DataFrame
+) -> slurm_sweeps.experiment.Result
 ```
-
 Run the experiment.
 
-**Arguments**:
+**Arguments**
+- `n_trials`: Number of trials to run.
+- `max_concurrent_trials`: The maximum number of trials running concurrently. By default, we will set this to the number of cpus available, or the number of total Slurm tasks divided by the number of tasks requested per trial.
+- `summary_interval_in_sec`: Print a summary of the experiment every x seconds.
+- `nr_of_rows_in_summary`: How many rows of the summary table should we print?
+- `summarize_cfg_and_metrics`: Should we include the cfg and the metrics in the summary table? You can also pass in a list of strings to only select a few cfg and metric keys.
 
-- `n_trials` - Number of trials to run. For grid searches, this parameter is ignored.
-- `max_concurrent_trials` - The maximum number of trials running concurrently. By default, we will set this to
-  the number of cpus available, or the number of total Slurm tasks divided by the number of tasks
-  requested per trial.
-- `summary_interval_in_sec` - Print a summary of the experiment every x seconds.
-- `nr_of_rows_in_summary` - How many rows of the summary table should we print?
-- `summarize_cfg_and_metrics` - Should we include the cfg and the metrics in the summary table?
-  You can also pass in a list of strings to only select a few cfg and metric keys.
-
-**Returns**:
-
-  A summary of the trials in a pandas DataFrame.
-
-### `CLASS slurm_sweeps.ASHA`
-
-```python
-class ASHA(
-    metric: str,
-    mode: str,
-    reduction_factor: int = 4,
-    min_t: int = 1,
-    max_t: int = 50,
-)
-```
-
-Basic implementation of the Asynchronous Successive Halving Algorithm (ASHA) to prune unpromising trials.
-
-**Arguments**:
-
-- `metric` - The metric you want to optimize.
-- `mode` - Should the metric be minimized or maximized? Allowed values: ["min", "max"]
-- `reduction_factor` - The reduction factor of the algorithm
-- `min_t` - Minimum number of iterations before we consider pruning.
-- `max_t` - Maximum number of iterations.
-
-#### `ASHA.metric`
-
-```python
-@property
-def metric() -> str
-```
-
-The metric to optimize.
-
-#### `ASHA.mode`
-
-```python
-@property
-def mode() -> str
-```
-
-The 'mode' of the metric, either 'max' or 'min'.
-
-#### `ASHA.find_trials_to_prune`
-
-```python
-def find_trials_to_prune(database: "pd.DataFrame") -> List[str]
-```
-
-Check the database and find trials to prune.
-
-**Arguments**:
-
-- `database` - The experiment's metrics table of the database as a pandas DataFrame.
+**Returns**
+- A summary of the trials in a pandas DataFrame.
 
 
-**Returns**:
-
-  List of trial ids that should be pruned.
-
-### CLASS `slurm_sweeps.SlurmCfg`
-
+### CLASS `slurm_sweeps.SweepConfig`
 ```python
 @dataclass
-class SlurmCfg:
-  exclusive: bool = True
-  nodes: int = 1
-  ntasks: int = 1
-  args: str = ""
+class SweepConfig:
+    metric: str
+    mode: Literal['min', 'max']
+    use_asha: Union[bool, slurm_sweeps.asha.AshaConfig] = True
+    use_tpe: Union[bool, slurm_sweeps.tpe.TpeConfig] = True
 ```
+Configure the sweep.
 
+**Arguments**
+- `metric`: Metric to optimize.
+- `mode`: Minimize or maximize the metric? Possible values: "min" or "max".
+- `use_asha`: Use the ASHA scheduler to prune weak trials? You can also pass in a `AshaConfig` to configure the scheduler.
+- `use_tpe`: Use a Tree-Structured Parzen Estimator to suggest new trials? You can also pass in a `TpeConfig` to configure the estimator.
+
+
+### CLASS `slurm_sweeps.AshaConfig`
+```python
+@dataclass
+class AshaConfig:
+    reduction_factor: int = 4
+    min_t: int = 1
+    max_t: int = 50
+```
+A configuration class for the ASHA algorithm.
+
+**Arguments**
+- `reduction_factor`: The reduction factor of the algorithm
+- `min_t`: Minimum number of iterations before we consider pruning.
+- `max_t`: Maximum number of iterations.
+
+
+### CLASS `slurm_sweeps.TpeConfig`
+```python
+@dataclass
+class TpeConfig:
+    fraction: float = 0.1
+    gamma: float = 0.25
+    min_bandwidth: float = 0.03
+    n_ei: int = 24
+    n_i: int = 10
+```
+A configuration class for the TPE algorithm.
+
+
+### CLASS `slurm_sweeps.SlurmConfig`
+```python
+@dataclass
+class SlurmConfig:
+    exclusive: bool = True
+    nodes: int = 1
+    ntasks: int = 1
+    args: str = ''
+```
 A configuration class for the SlurmBackend.
 
-**Arguments**:
+**Arguments**
+- `exclusive`: Add the `--exclusive` switch.
+- `nodes`: How many nodes do you request for your srun?
+- `ntasks`: How many tasks do you request for your srun?
+- `args`: Additional command line arguments for srun, formatted as a string.
 
-- `exclusive` - Add the `--exclusive` switch.
-- `nodes` - How many nodes do you request for your srun?
-- `ntasks` - How many tasks do you request for your srun?
-- `args` - Additional command line arguments for srun, formatted as a string.
 
 ### CLASS `slurm_sweeps.Result`
-
 ```python
 class Result(
     experiment: str,
-    local_dir: Union[str, Path] = "./slurm-sweeps",
+    local_dir: Union[str, pathlib.Path] = './slurm-sweeps'
 )
 ```
-
 The result of an experiment.
 
-**Arguments**:
+**Arguments**
+- `experiment`: The name of the experiment.
+- `local_dir`: The directory where we look for the `slurm-sweeps.db` database.
 
-- `experiment` - The name of the experiment.
-- `local_dir` - The directory where we find the `slurm-sweeps.db` database.
+#### `Result.best_trial`
+```python
+def best_trial(
+    self,
+    metric: Optional[str] = None,
+    mode: Optional[str] = None
+) -> slurm_sweeps.trial.Trial
+```
+Get the best performing trial of the experiment.
+
+**Arguments**
+- `metric`: The metric. By default, we take the one defined by ASHA.
+- `mode`: The mode of the metric, either 'min' or 'max'. By default, we take the one defined by ASHA.
+
+**Returns**
+- The best trial.
 
 #### `Result.experiment`
-
 ```python
 @property
 def experiment() -> str
 ```
-
 The name of the experiment.
 
 #### `Result.trials`
-
 ```python
 @property
-def trials() -> List[Trial]
+def trials() -> typing.List
 ```
-
 A list of the trials of the experiment.
 
-#### `Result.best_trial`
 
-```python
-def best_trial(
-    metric: Optional[str] = None,
-    mode: Optional[str] = None
-) -> Trial
-```
-
-Get the best performing trial of the experiment.
-
-**Arguments**:
-
-- `metric` - The metric. By default, we take the one defined by ASHA.
-- `mode` - The mode of the metric, either 'min' or 'max'. By default, we take the one defined by ASHA.
-
-**Returns**:
-
-  The best trial.
-
-### CLASS `slurm_sweeps.trial.Trial`
-
+### CLASS `slurm_sweeps.Trial`
 ```python
 @dataclass
 class Trial:
     cfg: Dict
     process: Optional[subprocess.Popen] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    status: Optional[Union[str, Status]] = None
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
+    status: Optional[Union[str, slurm_sweeps.trial.Status]] = None
     metrics: Optional[Dict[str, Dict[int, Union[int, float]]]] = None
 ```
-
 A trial of an experiment.
 
-**Arguments**:
+**Arguments**
+- `cfg`: The config of the trial.
+- `process`: The subprocess that runs the trial.
+- `start_time`: The start time of the trial.
+- `end_time`: The end time of the trial.
+- `status`: Status of the trial. If `process` is not None, we will always query the process for the status.
+- `metrics`: Logged metrics of the trial.
 
-- `cfg` - The config of the trial.
-- `process` - The subprocess that runs the trial.
-- `start_time` - The start time of the trial.
-- `end_time` - The end time of the trial.
-- `status` - Status of the trial. If `process` is not None, we will always query the process for the status.
-- `metrics` - Logged metrics of the trial.
+#### `Trial.is_terminated`
+```python
+def is_terminated(
+    self
+) -> bool
+```
+Return True, if the trial has been completed or pruned.
+
+#### `Trial.runtime`
+```python
+@property
+def runtime() -> Optional[datetime.timedelta]
+```
+The runtime of the trial.
 
 #### `Trial.trial_id`
-
 ```python
 @property
 def trial_id() -> str
 ```
-
 The trial ID is a 6-digit hash from the config.
 
-#### `Trial.runtime`
-
-```python
-@property
-def runtime() -> Optional[timedelta]
-```
-
-The runtime of the trial.
-
-#### `Trial.is_terminated`
-
-```python
-def is_terminated() -> bool
-```
-
-Return True, if the trial has been completed or pruned.
-
-### FUNCTION `slurm_sweeps.log`
-
-```python
-def log(metrics: Dict[str, Union[float, int]], iteration: int)
-```
-
-Log metrics to the database.
-
-If ASHA is configured, this also checks if the trial needs to be pruned.
-
-**Arguments**:
-
-- `metrics` - A dictionary containing the metrics.
-- `iteration` - Iteration of the metrics. Most of the time this will be the epoch.
-
-**Raises**:
-
--  `TrialPruned` if the holy ASHA says so!
--  `TypeError` if a metric is not of type `float` or `int`.
 
 ## Contact
 David Carreto Fidalgo (david.carreto.fidalgo@mpcdf.mpg.de)
