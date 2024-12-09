@@ -36,7 +36,7 @@ def test_readme_example_on_local(tmp_path):
             "parameter": ss.Uniform(0, 2),
         },
         local_dir=tmp_path / "slurm_sweeps",
-        asha=ss.ASHA(metric="loss", mode="min"),
+        sweep_config=ss.SweepConfig(metric="loss", mode="min"),
     )
 
     # Run your experiment

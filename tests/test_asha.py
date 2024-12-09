@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from slurm_sweeps import ASHA
+from slurm_sweeps.asha import AshaConfig
 from slurm_sweeps.constants import DB_ITERATION, DB_METRIC, DB_TRIAL_ID
 
 
@@ -30,18 +31,22 @@ def database(request):
 
 def test_asha_init():
     with pytest.raises(AssertionError):
-        ASHA(metric="loss", mode="not min or max")
+        ASHA(metric="loss", mode="not min or max", config=AshaConfig())
     with pytest.raises(AssertionError):
-        ASHA(metric="loss", mode="min", reduction_factor=1)
+        ASHA(metric="loss", mode="min", config=AshaConfig(reduction_factor=1))
     with pytest.raises(AssertionError):
-        ASHA(metric="loss", mode="min", min_t=0)
+        ASHA(metric="loss", mode="min", config=AshaConfig(min_t=0))
     with pytest.raises(AssertionError):
-        ASHA(metric="loss", mode="min", min_t=2, max_t=1)
+        ASHA(metric="loss", mode="min", config=AshaConfig(min_t=2, max_t=1))
 
-    asha = ASHA(metric="loss", mode="min")
+    asha = ASHA(metric="loss", mode="min", config=AshaConfig())
     assert asha._rungs == [16, 4, 1]
 
-    asha = ASHA(metric="loss", mode="min", min_t=2, max_t=16, reduction_factor=2)
+    asha = ASHA(
+        metric="loss",
+        mode="min",
+        config=AshaConfig(min_t=2, max_t=16, reduction_factor=2),
+    )
     assert asha._rungs == [16, 8, 4, 2]
 
 
@@ -53,5 +58,5 @@ def test_asha_init():
     ],
 )
 def test_asha_rf(database, rf, expected):
-    asha = ASHA(metric="loss", mode="min", reduction_factor=rf)
+    asha = ASHA(metric="loss", mode="min", config=AshaConfig(reduction_factor=rf))
     assert asha.find_trials_to_prune(database) == expected

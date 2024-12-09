@@ -44,11 +44,16 @@ def test_grid():
 class TestSampler:
     def test_grid(self):
         cfg = {"a": Grid([1, 2, 3])}
-        samples = list(Sampler(cfg))
-        assert samples == [{"a": 1}, {"a": 2}, {"a": 3}]
+
+        sampler = Sampler(cfg)
+        assert sampler() == {"a": 1}
+        assert sampler() == {"a": 2}
+        assert sampler() == {"a": 3}
+        assert sampler() == {"a": 1}
 
         cfg = {"a": Grid([1, 2]), "b": {"aa": Grid([3, 4])}}
-        samples = list(Sampler(cfg))
+        sampler = Sampler(cfg)
+        samples = [sampler() for _ in range(4)]
         assert samples == [
             {"a": 1, "b": {"aa": 3}},
             {"a": 1, "b": {"aa": 4}},
