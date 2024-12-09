@@ -1,8 +1,7 @@
 import pandas as pd
 import pytest
 
-from slurm_sweeps import ASHA
-from slurm_sweeps.asha import AshaConfig
+from slurm_sweeps.asha import ASHA, AshaConfig
 from slurm_sweeps.constants import DB_ITERATION, DB_METRIC, DB_TRIAL_ID
 
 
